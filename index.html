@@ -1,0 +1,3645 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>木工製作ナビ＋ v2.4</title>
+<style>
+:root{
+  --ink:#2a2520; --sub:#7b7166; --line:#ddd6cb; --bg:#f6f3ec; --panel:#fffdf8;
+  --accent:#8a5a2b; --soft:#f0e3d2; --ok:#3d7a56; --warn:#b8761c; --bad:#b0463c;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);overflow:hidden;
+  font:13px/1.5 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+button,select,input{font:inherit;color:inherit}
+button{background:#fff;border:1px solid var(--line);border-radius:5px;padding:4px 9px;cursor:pointer}
+button:hover{background:var(--soft)}
+button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* ---------- ヘッダー ---------- */
+header{height:42px;display:flex;align-items:center;gap:10px;padding:0 12px;
+  background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:14px;margin:0;letter-spacing:.03em;white-space:nowrap}
+header .ver{color:var(--sub);font-size:10px;margin-left:4px}
+header .sub2{color:var(--sub);font-size:10.5px;white-space:nowrap;
+  flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:1200px){header .sub2{display:none}}
+header .now{font-weight:600;font-size:13px;white-space:nowrap;flex:none}
+header button,header .steps,header .about{flex:none;white-space:nowrap}
+header .stars{color:var(--accent);letter-spacing:.05em}
+/* 半分だけ色がつく★（★2.5 の表示用） */
+.halfstar{background:linear-gradient(90deg,var(--accent) 0 50%,#cfc7ba 50% 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  -webkit-text-fill-color:transparent}
+header .spacer{margin-left:auto}
+
+/* ---------- 本体 3カラム ---------- */
+main{height:calc(100vh - 42px - 250px);min-height:260px;
+  display:grid;grid-template-columns:212px minmax(300px,1fr) 248px;grid-template-rows:minmax(0,1fr)}
+aside{background:var(--panel);overflow-y:auto;padding:9px 10px}
+aside.l{border-right:1px solid var(--line)}
+aside.r{border-left:1px solid var(--line)}
+h2{font-size:11px;letter-spacing:.08em;color:var(--sub);margin:0 0 6px;font-weight:600}
+/* 折りたたみできる見出し（見出しは常に見えるので、機能を見のがさない） */
+.acc>h2{cursor:pointer;display:flex;align-items:center;gap:4px;padding:5px 4px;margin:0;
+  border-radius:5px;user-select:none}
+.acc>h2:hover{background:#efe6d6}
+.acc>h2::before{content:'▸';font-size:9px;color:var(--accent);transition:transform .12s}
+.acc.open>h2::before{transform:rotate(90deg)}
+.acc:not(.open)>.accb{display:none}
+.acc>.accb{padding:0 2px 10px}
+.acc+.acc{border-top:1px solid var(--line)}
+
+.plist{display:flex;flex-direction:column;gap:3px}
+.plist button{display:flex;justify-content:space-between;align-items:center;gap:6px;
+  width:100%;text-align:left;padding:4px 7px;font-size:12px}
+.plist .sz{font-size:10.5px;color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap}
+.plist button.on .sz{color:#f3e6d6}
+
+#stage{position:relative;background:#eceff1;overflow:hidden}
+#stage canvas{display:block}
+#dimCv{position:absolute;inset:0;width:100%;height:100%;background:#fffdf8;z-index:2}
+.viewbar{position:absolute;left:8px;top:8px;display:flex;gap:4px;flex-wrap:wrap;z-index:3}
+.viewbar button{padding:3px 8px;font-size:11.5px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.viewbar .vwrap{flex-basis:100%;height:0}
+.hint{position:absolute;left:8px;bottom:8px;color:#48535e;font-size:11px;z-index:3;
+  background:rgba(255,255,255,.88);padding:3px 8px;border-radius:4px}
+.hint b{color:#a8256f}
+
+.corners{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.corner{border:1px solid var(--line);border-radius:5px;padding:4px 5px;background:#fff}
+.corner .cl{font-size:10px;color:var(--sub)}
+.corner select{width:100%;border:0;padding:1px 0;font-size:11.5px;background:transparent}
+.corner input{width:100%;border:0;border-top:1px solid #efe9e0;padding:1px 0;font-size:11.5px;
+  font-variant-numeric:tabular-nums;background:transparent}
+.corner.off select{color:var(--sub)}
+.corner.off input{color:#b9b1a5}
+.corner.off .cl{color:#b9b1a5}
+.refadd{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px}
+.refadd button{font-size:11px;padding:4px 2px;display:flex;flex-direction:column;
+  align-items:center;gap:1px;line-height:1.25}
+.refadd button .cap{font-size:9.5px;color:var(--sub);font-variant-numeric:tabular-nums}
+.refadd button.full{background:#f2ece0;color:#a79d90}
+.refadd button.full .cap{color:#c2b8a8}
+#refClear{grid-column:1/3;background:#fbf4e8;border-color:#e0cfae;
+  color:#8a6a2a;font-weight:600;flex-direction:row;justify-content:center}
+#refClear[disabled]{background:#f6f4f0;border-color:var(--line);color:#bdb6ac;cursor:default}
+#refFull{color:#b8761c}
+.rsz{display:grid;grid-template-columns:auto 1fr auto 1fr auto 1fr;gap:2px 4px;align-items:center;font-size:10.5px}
+.rsz input{width:100%;border:1px solid var(--line);border-radius:3px;padding:1px 3px;
+  font-size:11px;font-variant-numeric:tabular-nums}
+.row{display:flex;gap:4px;margin-top:5px}
+.row button{flex:1;font-size:11.5px;padding:4px 4px}
+.note{font-size:10.5px;color:var(--sub);margin:5px 0 0;line-height:1.45}
+
+/* ---------- 下段 ---------- */
+.bottom{height:250px;border-top:1px solid var(--line);background:var(--panel);
+  display:grid;grid-template-columns:1fr 300px;grid-template-rows:minmax(0,1fr);overflow:hidden}
+.nest{padding:7px 10px;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.nest .hd{display:flex;align-items:baseline;gap:8px}
+.nestbody{flex:1;min-height:0;display:grid;grid-template-columns:452px 1fr;gap:12px}
+.cvbox{position:relative;min-height:0}
+.cvbox canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.ptbl{overflow:auto;font-size:11px}
+.ptbl table{border-collapse:collapse;width:100%}
+.ptbl th{text-align:left;font-weight:600;color:var(--sub);font-size:10px;letter-spacing:.06em;
+  border-bottom:1px solid var(--line);padding:2px 6px 3px 0}
+.ptbl td{padding:2px 6px 2px 0;border-bottom:1px solid #f1ece4;white-space:nowrap}
+.ptbl td.n{text-align:right;font-variant-numeric:tabular-nums}
+.checks{border-left:1px solid var(--line);padding:7px 10px;overflow-y:auto}
+.msg{display:flex;gap:5px;align-items:flex-start;font-size:11.5px;padding:3px 0;
+  border-bottom:1px solid #f1ece4;line-height:1.45}
+.msg .bd{flex:0 0 auto;width:15px;height:15px;border-radius:50%;display:grid;place-items:center;
+  font-size:10px;color:#fff;margin-top:1px}
+.msg.ok .bd{background:var(--ok)} .msg.warn .bd{background:var(--warn)} .msg.bad .bd{background:var(--bad)}
+.work{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px}
+.tag{font-size:10.5px;background:var(--soft);border-radius:3px;padding:1px 6px;
+  font-variant-numeric:tabular-nums}
+
+/* ---------- 寸法スライダー ---------- */
+.dimrow{margin:0 0 7px}
+.dimrow .lb{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;
+  color:var(--sub);gap:4px}
+.dimrow .lb b{font-size:12.5px;color:#3f3225;font-variant-numeric:tabular-nums}
+.dimrow input[type=range]{width:100%;margin:1px 0 0;accent-color:var(--accent);height:16px}
+.dimrow input[type=range]:disabled{accent-color:#c6bdb0}
+.dimrow .rng{font-size:10px;color:#a79d90;display:flex;justify-content:space-between;gap:4px;
+  margin-top:-1px;font-variant-numeric:tabular-nums}
+.dimrow .rng .full{color:#b8761c}
+.dimrow .rng .why{color:#b8761c;background:#fff4dc;border-color:#e8cf9a;font-size:10px;
+  padding:0 5px;border-radius:9px;line-height:15px}
+#size3 .tip{font-size:10.5px;color:var(--sub);line-height:1.5;margin-top:8px;
+  border-top:1px dashed var(--line);padding-top:6px}
+#size3 .tip b{color:#3f3225}
+.dimrow.moved .lb b{color:#b8761c}
+#size3 .bar{font-size:10.5px;color:var(--sub);line-height:1.55;margin:0 0 7px}
+#size3 .bar b{color:#3f3225;font-variant-numeric:tabular-nums}
+#size3 .back{margin-top:6px}
+.orig{background:#fff4dc;border:1px solid #e8cf9a;border-radius:6px;padding:6px 8px;
+  font-size:11px;line-height:1.6;color:#7a5a17;margin-bottom:6px}
+.orig b{color:#b8761c}
+#modal textarea{width:100%;min-height:76px;border:1px solid var(--line);border-radius:6px;
+  padding:6px 8px;font-size:13px;font-family:inherit;line-height:1.6;margin-top:6px}
+#modal .err{color:#b0463c;font-size:12px;margin-top:4px}
+
+/* ---------- このソフトについて ---------- */
+#about{position:fixed;inset:0;z-index:70;background:rgba(40,34,28,.5);overflow:auto;padding:24px}
+#about .abox{background:#fff;max-width:720px;margin:0 auto;border-radius:12px;padding:22px 26px 28px;
+  position:relative;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+#about h3{margin:0 0 4px;font-size:18px}
+#about h4{margin:18px 0 4px;font-size:13px;color:var(--accent);letter-spacing:.04em}
+#about p,#about li{font-size:12.5px;line-height:1.8;color:#4b423a;margin:4px 0}
+#about ul{margin:4px 0;padding-left:18px}
+#about code{background:#f2ece0;padding:1px 5px;border-radius:4px;font-size:11.5px}
+#about #abClose{position:absolute;right:16px;top:16px}
+#about a{color:#1f5fa8}
+header .about{font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer;
+  background:none;border:none;padding:2px 4px}
+
+/* ---------- そうだん画面 ---------- */
+#quiz{position:fixed;inset:0;z-index:25;background:var(--bg);overflow:auto;padding:16px 22px 28px}
+#quiz .qhead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+#quiz h2{font-size:17px;color:#3f3225;letter-spacing:0;margin:0}
+#qBody{max-width:1000px;margin:0 auto}
+.qprog{font-size:13px;color:var(--sub);letter-spacing:.1em}
+.qq{font-size:25px;margin:8px 0 20px;color:#2a2520;line-height:1.5;font-weight:700}
+.qa{display:flex;flex-direction:column;gap:10px}
+.qa button{text-align:left;font-size:18px;padding:15px 20px;border-radius:9px;line-height:1.4}
+.qa button:hover{background:#efe6d6}
+.qrow{display:flex;gap:8px;align-items:center;margin-top:18px}
+.qrow button{font-size:14px;padding:8px 14px}
+.qcode{margin-top:26px;border-top:1px dashed var(--line);padding-top:14px;
+  font-size:14px;color:var(--sub);line-height:1.8}
+.qcode input{width:140px;font-size:18px;padding:5px 10px;border:1px solid var(--line);
+  border-radius:6px;margin:0 6px;letter-spacing:.14em;font-variant-numeric:tabular-nums}
+.qcodeout{background:#fff4dc;border:1px solid #e8cf9a;border-radius:9px;padding:12px 16px;
+  margin:10px 0 14px;font-size:18px;color:#7a5a17}
+.qcodeout b{font-size:24px;letter-spacing:.16em;color:#b8761c;font-variant-numeric:tabular-nums}
+.qcodeout span{display:block;font-size:13px;color:#9a8358;margin-top:3px}
+.qlead{font-size:15.5px;color:#4b423a;line-height:1.8;margin:0 0 14px}
+.qlead2{font-size:14px;color:#4b423a;line-height:1.8;margin:20px 0 8px;
+  border-top:1px dashed var(--line);padding-top:14px}
+.qrest{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.rcard{background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px;
+  text-align:left;display:flex;flex-direction:column;gap:3px}
+.rcard:hover{border-color:var(--accent)}
+.rcard .t{font-weight:600;font-size:12.5px;display:flex;justify-content:space-between;align-items:center}
+.rcard .st{color:var(--accent);font-size:11px}
+.rcard canvas{width:100%;height:62px;display:block}
+.rcard .mm{font-size:10.5px;color:var(--sub);font-variant-numeric:tabular-nums}
+.rcard .rw{font-size:10.5px;color:#7b7166;line-height:1.45}
+.qcards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.qcard{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;
+  display:flex;flex-direction:column;gap:5px}
+.qcard .t{font-weight:700;font-size:16px;display:flex;justify-content:space-between;align-items:center}
+.qcard .st{color:var(--accent);font-size:12px}
+.qcard canvas{width:100%;height:96px;display:block}
+.qcard .mm{font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums}
+.qcard ul{margin:2px 0 6px;padding-left:16px;font-size:13px;color:#4b423a;line-height:1.65}
+.qcard button{margin-top:auto;background:var(--accent);border-color:var(--accent);color:#fff;
+  padding:9px;font-size:14.5px}
+.reco{margin:10px 0 4px;font-size:12px;color:var(--accent);font-weight:600}
+.card.rec{border-color:var(--accent);box-shadow:0 0 0 2px #e8d5b8}
+.card .rwhy{font-size:10.5px;color:var(--accent);line-height:1.5}
+
+/* ---------- 紙の画面（見た目図・説明書） ---------- */
+.paper{position:fixed;inset:0;z-index:30;background:#efeae0;display:flex;flex-direction:column}
+.paper .pbar{display:flex;gap:8px;align-items:center;padding:7px 12px;background:var(--panel);
+  border-bottom:1px solid var(--line);font-size:13px}
+.paper .pbody{flex:1;overflow:auto;display:flex;justify-content:center;padding:14px}
+svg.a4{width:min(820px,100%);height:auto;background:#fff;box-shadow:0 3px 14px rgba(0,0,0,.18)}
+.grow{flex:1}
+.steps{display:flex;gap:3px}
+.steps button{font-size:11px;padding:3px 7px}
+.steps button.now{background:var(--accent);border-color:var(--accent);color:#fff}
+@media print{
+  body{background:#fff}
+  header,main,.bottom,#picker,#draw,#modal,.paper .pbar{display:none!important}
+  .paper{position:static;background:#fff}
+  .paper .pbody{padding:0;overflow:visible}
+  svg.a4{width:100%;box-shadow:none}
+  @page{size:A4 portrait;margin:8mm}
+}
+
+/* ---------- ダイアログ ---------- */
+#modal{position:fixed;inset:0;z-index:60;background:rgba(40,34,28,.45);
+  display:flex;align-items:center;justify-content:center}
+#modal .mbox{background:#fff;border-radius:12px;padding:18px 20px;max-width:560px;
+  box-shadow:0 12px 40px rgba(0,0,0,.28)}
+#modal h3{margin:0 0 8px;font-size:16px;color:#b0463c}
+#modal #mBody{font-size:13.5px;line-height:1.75;color:#4b423a}
+#modal #mBody p{margin:6px 0}
+#modal .mrow{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+#modal b{color:var(--accent)}
+
+/* ---------- 作品選び ---------- */
+#draw{position:fixed;inset:0;background:var(--bg);z-index:22;display:flex;flex-direction:column}
+.dhead{height:44px;display:flex;align-items:center;gap:10px;padding:0 14px;
+  background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto}
+.dhead b{font-size:14px;letter-spacing:.03em;white-space:nowrap}
+.dhead .spacer{margin-left:auto}
+.dbody{flex:1;min-height:0;position:relative;background:#fffdf8}
+.dbody canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.dfoot{flex:0 0 auto;padding:7px 14px;font-size:11.5px;color:var(--sub);line-height:1.6;
+  border-top:1px solid var(--line);background:var(--panel)}
+.dfoot b{color:var(--ink)}
+#picker{position:fixed;inset:0;background:var(--bg);z-index:20;
+  display:flex;flex-direction:column;padding:14px 18px;overflow:auto}
+#picker h3{margin:0;font-size:17px;letter-spacing:.04em}
+#picker .lead{color:#4b423a;font-size:17px;margin:8px 0 0;max-width:70ch;line-height:1.65}
+#picker .lead b{color:var(--accent)}
+.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-top:11px}
+.card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;
+  text-align:left;display:flex;flex-direction:column;gap:4px}
+.card:hover{border-color:var(--accent);background:#fffaf2}
+.card .t{display:flex;justify-content:space-between;align-items:baseline}
+.card .nm{font-weight:600;font-size:12.5px}
+.card .st{color:var(--accent);font-size:12px;letter-spacing:.06em}
+.card canvas{width:100%;height:78px;display:block}
+.card .mm{font-size:10.5px;color:var(--sub);font-variant-numeric:tabular-nums;line-height:1.45}
+.card .why{font-size:10.5px;color:var(--accent);line-height:1.4;min-height:29px}
+.card .st{white-space:nowrap}
+.pfoot{margin-top:12px;font-size:12px;color:var(--sub);line-height:1.8;max-width:none}
+.pfoot b{color:var(--ink)}
+#pClose{position:absolute;right:16px;top:14px}
+
+body.dim .bottom{display:none}
+body.dim main{height:calc(100vh - 42px)}
+
+@media (max-height:720px){
+  main{height:calc(100vh - 42px - 228px)}
+  .bottom{height:228px}
+  .card canvas{height:64px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>木工製作ナビ＋<span class="ver">v2.4</span></h1>
+  <span class="sub2">説明書ではわからないところを見て、材料の範囲内で自分なりにアレンジする</span>
+  <span class="now" id="nowWork"></span>
+  <button id="pick">作品を選ぶ</button>
+  <span class="spacer"></span>
+  <span class="steps" id="mSteps"></span>
+  <button id="save">保存</button>
+  <button id="openBtn">開く</button>
+  <button class="about" id="aboutBtn">このソフトについて</button>
+  <input type="file" id="openFile" accept=".json" hidden>
+</header>
+
+<main>
+  <aside class="l">
+    <section class="acc open"><h2>板の一覧（クリックで選ぶ）</h2>
+      <div class="accb"><div class="plist" id="parts"></div></div></section>
+    <section class="acc open"><h2>大きさをかえる</h2>
+      <div class="accb"><div id="size3"></div></div></section>
+  </aside>
+
+  <section id="stage">
+    <div class="viewbar">
+      <button data-v="iso">ななめ</button><button data-v="front">正面</button>
+      <button data-v="side">横</button><button data-v="top">上</button>
+      <button data-v="fit">作品に寄る</button><button data-v="desk">引いて見る</button><button data-z="in">＋</button><button data-z="out">－</button>
+      <span class="vwrap"></span>
+      <button id="roomBtn">置いて見る</button>
+      <select id="sceneSel" title="置く場所"></select>
+      <button id="nameBtn">板の名前</button><button id="nailBtn">釘を見る</button>
+      <button id="endBtn">材料の両はし</button><button id="dimBtn">寸法を見る</button>
+    </div>
+    <canvas id="dimCv" hidden></canvas>
+    <div class="hint" id="hint"></div>
+  </section>
+
+  <aside class="r">
+    <section class="acc open"><h2>選んだ板の角の加工</h2>
+      <div class="accb"><div id="cbox"></div></div></section>
+    <section class="acc"><h2>きれいな面（製材所の切り口）</h2>
+      <div class="accb"><div id="endBox"></div></div></section>
+    <section class="acc"><h2>穴をあける</h2>
+      <div class="accb"><div id="holeBox"></div></div></section>
+    <section class="acc open"><h2>中に入れてみる（大きさくらべ）</h2>
+      <div class="accb"><div class="refadd" id="refAdd"></div>
+      <div id="refFull" class="note"></div>
+      <div class="plist" id="refList"></div><div id="refEdit"></div></div></section>
+  </aside>
+</main>
+
+<div class="bottom">
+  <div class="nest">
+    <div class="hd"><h2 style="margin:0">材料取り（実物と同じ比率）</h2>
+      <span id="nestNote" class="note" style="margin:0"></span></div>
+    <div class="nestbody">
+      <div class="cvbox"><canvas id="nestCv"></canvas></div>
+      <div class="ptbl"><table><thead><tr><th>部品名</th><th>仕上がり寸法</th><th>数</th></tr></thead>
+        <tbody id="ptbl"></tbody></table></div>
+    </div>
+  </div>
+  <div class="checks">
+    <div class="work" id="workTags"></div>
+    <div id="msgs"></div>
+  </div>
+</div>
+
+<div id="draw" hidden>
+  <div class="dhead">
+    <b>けがき ― 材料に線を引こう</b><span id="dsub" class="note" style="margin:0"></span>
+    <span class="grow"></span><span class="steps" id="dSteps"></span>
+    <span class="spacer"></span>
+    <button id="dNail">釘を見る</button>
+    <button id="dZoomOut" hidden>材料ぜんぶに戻す</button>
+    <button id="dSave">ファイルに保存</button>
+    <button id="dBack">②CADに戻る</button>
+  </div>
+  <div class="dbody"><canvas id="drawCv"></canvas></div>
+  <div class="dfoot" id="dfoot"></div>
+</div>
+
+<div id="about" hidden><div class="abox">
+  <button id="abClose">閉じる</button>
+  <h3>このソフトについて（外部通信とライセンス）</h3>
+
+  <h4>外部通信とデータ</h4>
+  <p>このソフトは <b>HTMLファイル1個</b>で動きます。解析ツール・広告は使っていません。
+  設計データ・名前・入力した文章を、外部に送信することはありません。</p>
+  <p>ただし1つだけ外部から読みこむものがあります。<b>3D表示に使う Three.js を
+  cdnjs.cloudflare.com から読みこみます</b>。学校のネットワークでここが止まっている場合、
+  3Dの画面だけ出ませんが、材料取り・寸法図・けがき・見た目図・説明書は そのまま使えます。
+  three.min.js を このHTMLと同じ場所に置いて 1行書きかえれば、完全にオフラインで動きます。</p>
+  <p>設計は「保存」を押したときだけ、<b>JSONファイルとして自分の端末に</b>保存されます。
+  ブラウザへの自動保存はしていません（画面を閉じると消えます）。こまめに保存してください。</p>
+  <p><b>名前について：</b>説明書に印刷するために入れた名前は、
+  保存するJSONファイルの中と、印刷した紙に入ります。残したくないときは空のままにしてください。</p>
+
+  <h4>CDN・外部ライブラリの使用状況</h4>
+  <ul>
+    <li>CDNから読みこむライブラリ：<b>Three.js r128</b>（3D表示のみ）</li>
+    <li>そのほかの外部ライブラリ・フォント・アイコン：なし</li>
+    <li>材料取り図・寸法図・けがき図は ブラウザ標準の Canvas 2D、
+        見た目図と説明書は このHTML内で作った SVG です。外部には接続しません</li>
+  </ul>
+
+  <h4>このソフトが しないこと（だいじ）</h4>
+  <ul>
+    <li>板は<b>理想の直方体</b>として計算します。実物の反り・厚みのばらつき・木のふしは考えていません</li>
+    <li>釘は必ず決めた位置に入る前提です。実際は割れたり曲がったりします</li>
+    <li>強度の計算はしていません。★は「組み立てのむずかしさ」の目安で、じょうぶさの保証ではありません</li>
+    <li><b>けがきは、かならず実物の材料を当てて確かめてください。</b>
+        画面の数字は、そのための下じたくです</li>
+  </ul>
+
+  <h4>作品例について</h4>
+  <p>作品例A〜Jの寸法は、学校で配られた教材資料（山崎教育システム）の寸法表・組立図を
+  参考にしています。このソフトは同社とは関係がありません。</p>
+
+  <h4>ライセンス</h4>
+  <p>作者：<b>近藤 昌也</b>（金沢市立野田中学校）<br>
+  <b>Creative Commons 表示 4.0 国際（CC BY 4.0）</b>。
+  営利・非営利を問わず、利用・複製・改変・再配布できます。</p>
+  <ul>
+    <li>作者名「近藤 昌也」を表示する</li>
+    <li>CC BY 4.0 とライセンスへのリンクを示す
+      （<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank"
+      rel="noopener">creativecommons.org</a>／このリンクは、押したときだけ外部サイトを開きます）</li>
+    <li>改変した場合は、変更したことを明示する</li>
+    <li>後続利用者の権利を妨げる追加的な制約を設けない</li>
+  </ul>
+  <p>無保証で提供します。第三者が持つ権利のすべてを許諾するものではありません。</p>
+
+  <h4>作りかえてください</h4>
+  <p>このソフトはHTMLファイル1個です。端末に置けば、自分の学校の材料や作品例に
+  自由に作りかえられます。材料は先頭の <code>STOCK</code>、作品例は <code>WORKS</code> の
+  数行を書きかえるだけです。ぜひ バイブコーディングで改造してみてください。</p>
+  <p class="note">動作確認：Chrome／Chromebook 1366×768</p>
+</div></div>
+
+<div id="quiz" hidden>
+  <div class="qhead"><h2>そうだん ― 何のために作るのかを決めよう</h2>
+    <span class="grow"></span><span class="steps" id="qSteps"></span>
+    <button class="about" id="aboutBtn2">このソフトについて</button></div>
+  <div id="qBody"></div>
+</div>
+
+<div id="view" class="paper" hidden>
+  <div class="pbar"><b>見た目図 ― 形を読みとる</b>
+    <span class="grow"></span>
+    <span class="steps" id="vSteps"></span>
+    <button id="vPrint">印刷する</button></div>
+  <div class="pbody" id="vBody"></div>
+</div>
+
+<div id="sheet" class="paper" hidden>
+  <div class="pbar"><b>製作の手引き ― この1枚で作れる</b>
+    <span class="grow"></span>
+    <span class="steps" id="sSteps"></span>
+    <label style="font-size:12px">名前
+      <input id="whoIn" type="text" placeholder="1年1組1番 ○○" style="width:150px"></label>
+    <button id="sPrint">印刷する</button></div>
+  <div class="pbody" id="sBody"></div>
+</div>
+
+<div id="modal" hidden><div class="mbox">
+  <h3 id="mTtl">確かめよう</h3>
+  <div id="mBody"></div>
+  <div class="mrow"><button id="mNo">材料取り図で直す</button>
+    <button id="mYes" class="on">このまま進む</button></div>
+</div></div>
+
+<div id="picker">
+  <button id="pClose" hidden>閉じる</button>
+  <h3>作る作品を選ぼう</h3>
+  <p class="lead">資料の作品例A〜Jを、そのままの寸法で読み込みます。<br>
+    あとから<b>角の加工・板の長さ・作品のサイズ</b>を自分好みに変えられます。</p>
+  <div id="recoHead"></div>
+  <div class="cards" id="cards"></div>
+  <p class="pfoot">
+    <b>★の見方</b>　★は「組み立ての難しさ」です。切る回数や釘の本数より、
+    <b>その板を、どこで受けてもらえるか</b>で難しさが決まります。<br>
+    <b>★1</b>　板の端を、相手の板の<b>角に合わせて</b>打つ。棚板も<b>左右の側板に挟まれる</b>ので、
+    高さの線を引いて挟めば位置が決まり、ひとりでに直角になります。<br>
+    <b>★2</b>　底板や棚板の<b>面の途中に、板を立てて</b>突き当てる。
+    釘を打つ位置を自分で決め、板が<b>垂直に立っているか</b>を見ながら打ちます。
+    切り口の直角が出ていないと、そこから曲がっていきます。<br>
+    <b>★2.5</b>　立てる板が<b>3枚以上</b>。1枚ずつのわずかな傾きが重なるので、
+    形は簡単でも<b>ガタつきやすい</b>作品です。<br>
+    <b>★3</b>　立てた板の<b>上にさらに板が乗る</b>。上と下の両方で位置を決めることになり、
+    立てた板の長さが少し違うだけで、乗せた板が浮きます。<br>
+    <b>★4</b>　向きの違う仕切板、小さな部品、立てた板の横にも付く棚板など。<b>押さえる手が足りなくなります</b>。<br>
+    <span style="color:#a8256f">★3・★4は、小学校でのこぎりを使って何かを作った経験がほとんどない人だと、
+    先生に何度も手伝ってもらうことになるか、出来上がりが少しガタついてしまうかもしれません。
+    時間に余裕をもって、焦らず進められるときに選びましょう。</span><br>
+    下の数字は作業量（切る回数・角の加工・釘の本数）です。<span style="color:#b9b1a5">カードの「説明書の難易度」は、配られた冊子に書かれている★（加工の量で決まっています）。このソフトの★は、上のとおり組み立ての難しさで決めています。</span>
+  </p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+/* =========================================================
+   1) 材料（実物）
+   12×150×600 が2枚、12×60×600 が1枚。縦びきはしない。
+   ========================================================= */
+const T=12, KERF=5;
+/* 標準的な学習机：はば1000・おくゆき600・高さ700mm。上だなの下のあきは400mm。
+   3D画面では「机の天板の上」が y=0。作品はその上に置かれる。 */
+const DESK={W:1000, D:600, H:700, T:25, SH:400, SHD:130};
+/* 置き場所の場面。top＝作品をのせる面の、ゆかからの高さ。
+   shelf＝その上にあるたなまでのあき（0なら 上に何もない） */
+const SCENES={
+  desk   :{label:'自分のつくえの上', top:700, shelf:400, shelfName:'つくえの上だな'},
+  kitchen:{label:'台所のカウンター', top:850, shelf:600, shelfName:'つり戸だな'},
+  floor  :{label:'リビングのゆか',   top:0,   shelf:0,   shelfName:''},
+};
+const STOCK=[{id:'A',w:600,h:150},{id:'B',w:600,h:150},{id:'C',w:600,h:60}];
+
+/* 姿勢 → 回転と外寸。flat=寝かせる / side=左右に立てる / front=前後に立てる */
+const ROT={flat:[-Math.PI/2,0,0], side:[0,Math.PI/2,0], front:[0,0,0]};
+function extentOf(p){
+  if(p.posture==='flat') return [p.w,T,p.h];
+  if(p.posture==='side') return [T,p.h,p.w];
+  return [p.w,p.h,T];
+}
+/* 610…ではなく600の向きに切り取る長さ。もう片方は板の幅そのもの */
+/* 切った長さがどちらの向きか。部品に la を持たせてあるので正方形でも迷わない */
+function lenAxis(p){ return p.la || (Math.abs(p.w-p.bw)<0.5 ? 'h' : 'w'); }
+function cutLen(p){ return lenAxis(p)==='h' ? p.h : p.w; }
+/* 木目の向き：切り取った長さが板の縦（h）なら縦木目 */
+function grainVertical(p){ return lenAxis(p)==='h'; }
+
+/* =========================================================
+   2) 作品例A〜J（資料の部品表・組立図のとおり）
+   すべて mm。x=左右 / y=高さ / z=前後（＋が手前）
+   角: c は [左下,右下,右上,左上]。板の面を正面から見たときの位置。
+   ========================================================= */
+const BZ = -(150/2 + T/2);        // 背板の奥行位置（-81）
+const FZ =  (150/2 + T/2);        // 前板の奥行位置（+81）
+const chamfer = s => ({type:'chamfer', size:s});
+const round_  = s => ({type:'round',   size:s});
+const none    =      {type:'none',     size:15};
+/* 立てた板の「前上」＝角の番号3 */
+const topFront = cut => [none, none, none, cut || none];
+
+function side(id,name,h,x,cut){ return {id,name,role:'side',posture:'side',w:150,h,bw:150,la:'h',pos:[x,h/2,0],c:topFront(cut)}; }
+function flat(id,name,w,yTop,x=0){ return {id,name,role:'flat',posture:'flat',w,h:150,bw:150,la:'w',pos:[x,yTop-T/2,0],c:[none,none,none,none]}; }
+function divi(id,name,h,x,yBot,cut){ return {id,name,role:'side',posture:'side',w:150,h,bw:150,la:'h',pos:[x,yBot+h/2,0],c:topFront(cut)}; }
+function back(id,name,w,yBot,hh=60,bw=60){ return {id,name,role:'back',posture:'front',w,h:hh,bw,la:'w',pos:[0,yBot+hh/2,BZ],c:[none,none,none,none]}; }
+
+/* 寸法のきまり（10作品で共通）
+   外はば W → 側板の中心 x=±(W-T)/2 ／ 底板・棚板のはば W-2T ／ 背板のはば W
+   高さ H   → 側板の高さ。いちばん上の背板は上端にそろえる（yBot = H-60）
+   def が説明書どおりの寸法。スライダーを動かすとここが変わる。 */
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+const q5=v=>Math.round(v/5)*5;
+
+const WORKS = {
+A:{ name:'作品例A', manual:1, D:162,
+  desc:'2段の本立て。背板が上と下に1枚ずつ。',
+  dims:[{k:'W',label:'外はば',min:150,max:520,step:2,def:284},
+        {k:'H',label:'高さ',min:130,max:560,step:5,def:315},
+        {k:'sh',label:'棚板の高さ',min:60,max:520,step:5,def:177,
+         lim:d=>[55,d.H-T-20]}],
+  make(d){ const x=(d.W-T)/2, iw=d.W-2*T, sh=clamp(d.sh,52,d.H-T-20);
+    return [ side('L','左側板',d.H,-x,chamfer(50)), side('R','右側板',d.H,x,chamfer(50)),
+      flat('bo','底板',iw,12), flat('sh','棚板',iw,sh),
+      back('b1','背板（下）',d.W,0), back('b2','背板（上）',d.W,d.H-60) ]; } },
+
+B:{ name:'作品例B', manual:1, D:162,
+  desc:'背の高い2段。背板が3枚で、縦に長くてもぐらつかない。',
+  dims:[{k:'W',label:'外はば',min:150,max:520,step:2,def:194},
+        {k:'H',label:'高さ',min:200,max:560,step:5,def:390},
+        {k:'sh',label:'棚板の高さ',min:60,max:520,step:5,def:192,
+         lim:d=>[85,d.H-85]}],
+  make(d){ const x=(d.W-T)/2, iw=d.W-2*T, sh=clamp(d.sh,84,d.H-84);
+    return [ side('L','左側板',d.H,-x,chamfer(50)), side('R','右側板',d.H,x,chamfer(50)),
+      flat('bo','底板',iw,12), flat('sh','棚板',iw,sh),
+      back('b1','背板（下）',d.W,0), back('b2','背板（中）',d.W,sh-12),
+      back('b3','背板（上）',d.W,d.H-60) ]; } },
+
+C:{ name:'作品例C', manual:1, D:162,
+  desc:'真ん中の仕切板で2つに分ける本立て。',
+  dims:[{k:'W',label:'外はば',min:150,max:520,step:2,def:286},
+        {k:'H',label:'高さ',min:150,max:560,step:5,def:280}],
+  make(d){ const x=(d.W-T)/2, iw=d.W-2*T;
+    const b1=clamp(q5((d.H-60)*120/220),12,d.H-120);
+    return [ side('L','左側板',d.H,-x,chamfer(50)), side('R','右側板',d.H,x,chamfer(50)),
+      flat('bo','底板',iw,12),
+      divi('dv','仕切板',d.H-T,0,12,chamfer(50)),
+      back('b1','背板（下）',d.W,b1), back('b2','背板（上）',d.W,d.H-60) ]; } },
+
+D:{ name:'作品例D', manual:2, D:162,
+  desc:'下は棚、上は仕切りで2つ。角は丸くしてある。',
+  dims:[{k:'W',label:'外はば',min:150,max:520,step:2,def:254},
+        {k:'H',label:'高さ',min:150,max:560,step:5,def:280},
+        {k:'sh',label:'棚板の高さ',min:60,max:520,step:5,def:155,
+         lim:d=>[55,d.H-55]}],
+  make(d){ const x=(d.W-T)/2, iw=d.W-2*T, sh=clamp(d.sh,52,d.H-52);
+    return [ side('L','左側板',d.H,-x,round_(30)), side('R','右側板',d.H,x,round_(30)),
+      flat('bo','底板',iw,12), flat('sh','棚板',iw,sh),
+      divi('dv','仕切板',d.H-sh,0,sh,round_(30)),
+      back('b1','背板（下）',d.W,0), back('b2','背板（上）',d.W,d.H-60) ]; } },
+
+E:{ name:'作品例E', manual:2, D:162,
+  desc:'底板・棚板・天板が同じ寸法。角の加工はなし。ふたがある形。',
+  dims:[{k:'W',label:'外はば',min:150,max:520,step:2,def:214},
+        {k:'H',label:'高さ',min:150,max:560,step:5,def:280},
+        {k:'sh',label:'棚板の高さ',min:60,max:520,step:5,def:146,
+         lim:d=>[85,d.H-T-40]}],
+  make(d){ const x=(d.W-T)/2, iw=d.W-2*T, sh=clamp(d.sh,84,d.H-T-40);
+    return [ side('L','左側板',d.H,-x,null), side('R','右側板',d.H,x,null),
+      flat('bo','底板',iw,12), flat('sh','棚板',iw,sh), flat('tp','天板',iw,d.H),
+      back('b1','背板（下）',d.W,0), back('b2','背板（上）',d.W,sh-12) ]; } },
+
+F:{ name:'作品例F', manual:2, D:162,
+  desc:'横に長い4つ仕切り。仕切板が3枚ある。',
+  dims:[{k:'W',label:'外はば',min:200,max:580,step:2,def:460},
+        {k:'H',label:'高さ',min:100,max:400,step:5,def:150}],
+  make(d){ const x=(d.W-T)/2, iw=d.W-2*T, n=3, pitch=(iw+T)/(n+1);
+    const ps=[ side('L','左側板',d.H,-x,chamfer(30)), side('R','右側板',d.H,x,chamfer(30)),
+      flat('bo','底板',iw,12) ];
+    for(let i=1;i<=n;i++)
+      ps.push(divi('d'+i,'仕切板'+i,d.H-T,Math.round((i-(n+1)/2)*pitch*2)/2,12,chamfer(30)));
+    ps.push(back('b1','背板',d.W,d.H-60));
+    return ps; } },
+
+G:{ name:'作品例G', manual:2, D:174,
+  desc:'前板と取っ手が付く持ち運び箱。取っ手だけは細い板を使う。',
+  dims:[{k:'W',label:'外はば',min:200,max:520,step:2,def:280},
+        {k:'H',label:'高さ',min:162,max:400,step:5,def:190},
+        {k:'dv',label:'仕切板の位置',min:-160,max:160,step:5,def:0,
+         lim:d=>[-(d.W-2*T)/2+40,(d.W-2*T)/2-40]}],
+  make(d){ const x=(d.W-T)/2, iw=d.W-2*T, dv=clamp(d.dv,-(iw/2)+40,(iw/2)-40);
+    return [ side('L','左側板',d.H,-x,round_(30)), side('R','右側板',d.H,x,round_(30)),
+      flat('bo','底板',iw,12),
+      divi('dv','仕切板',d.H-T,dv,12,round_(30)),
+      {id:'bk',name:'背板',role:'back',posture:'front',w:d.W,h:150,bw:150,la:'w',pos:[0,75,BZ],c:[none,none,none,none]},
+      {id:'f1',name:'前板（下）',role:'front',posture:'front',w:d.W,h:60,bw:60,la:'w',pos:[0,30,FZ],c:[none,none,none,none]},
+      {id:'f2',name:'前板（上）',role:'front',posture:'front',w:d.W,h:60,bw:60,la:'w',pos:[0,120,FZ],c:[none,none,none,none]},
+      {id:'h1',name:'取っ手（左）',role:'part',posture:'side',w:50,h:20,bw:20,la:'w',nestBw:150,
+        pos:[-(d.W/2+6),140,0],c:[none,none,none,none],nestKey:'handle',nestLabel:'取っ手×2（糸のこ）'},
+      {id:'h2',name:'取っ手（右）',role:'part',posture:'side',w:50,h:20,bw:20,la:'w',nestBw:150,
+        pos:[ (d.W/2+6),140,0],c:[none,none,none,none],nestKey:'handle'} ]; } },
+
+H:{ name:'作品例H', manual:2, D:162,
+  desc:'下が2つに分かれた2段。背板が3枚。',
+  dims:[{k:'W',label:'外はば',min:150,max:520,step:2,def:194},
+        {k:'H',label:'高さ',min:180,max:560,step:5,def:280},
+        {k:'sh',label:'棚板の高さ',min:60,max:520,step:5,def:194,
+         lim:d=>[85,d.H-T-20]}],
+  make(d){ const x=(d.W-T)/2, iw=d.W-2*T, sh=clamp(d.sh,84,d.H-T-20);
+    return [ side('L','左側板',d.H,-x,chamfer(30)), side('R','右側板',d.H,x,chamfer(30)),
+      flat('bo','底板',iw,12), flat('sh','棚板',iw,sh),
+      divi('dv','仕切板',sh-12-T,0,12,null),
+      back('b1','背板（下）',d.W,0), back('b2','背板（中）',d.W,sh-60),
+      back('b3','背板（上）',d.W,d.H-60) ]; } },
+
+I:{ name:'作品例I', manual:3, D:162,
+  desc:'左だけに棚がある、左右で高さの違う作り。',
+  dims:[{k:'W',label:'外はば',min:180,max:520,step:2,def:286},
+        {k:'H',label:'高さ',min:150,max:560,step:5,def:200},
+        {k:'dv',label:'仕切板の位置',min:-160,max:160,step:5,def:0,
+         lim:d=>[-(d.W-2*T)/2+70,(d.W-2*T)/2-70]},
+        {k:'sh',label:'棚板の高さ',min:60,max:520,step:5,def:150,
+         lim:d=>[55,d.H-T-20]}],
+  make(d){ const x=(d.W-T)/2, iw=d.W-2*T;
+    const dv=clamp(d.dv,-(iw/2)+70,(iw/2)-70);
+    const sw=(dv-T/2)+(d.W/2-T), sx=(-(d.W/2-T)+(dv-T/2))/2;
+    const sh=clamp(d.sh,52,d.H-T-20);
+    return [ side('L','左側板',d.H,-x,chamfer(50)), side('R','右側板',d.H,x,chamfer(50)),
+      flat('bo','底板',iw,12),
+      divi('dv','仕切板',d.H-T,dv,12,chamfer(50)),
+      flat('sh','棚板',sw,sh,sx),
+      back('b1','背板（下）',d.W,0), back('b2','背板（上）',d.W,d.H-60) ]; } },
+
+J:{ name:'作品例J', manual:3, D:162,
+  desc:'横長の箱。右の部屋は前後にもう1枚仕切りが入る。',
+  dims:[{k:'W',label:'外はば',min:340,max:580,step:2,def:436},
+        {k:'H',label:'高さ',min:100,max:400,step:5,def:162}],
+  make(d){ const x=(d.W-T)/2, iw=d.W-2*T, span=150;
+    const dv=d.W/2-T-span-T/2, cx=dv+T/2+span/2;
+    return [ side('L','左側板',d.H,-x,chamfer(30)), side('R','右側板',d.H,x,chamfer(30)),
+      flat('bo','底板',iw,12),
+      divi('dA','仕切板A',d.H-T,dv,12,chamfer(30)),
+      {id:'dB',name:'仕切板B',role:'front',posture:'front',w:span,h:d.H-T,bw:150,la:'h',
+        pos:[cx,12+(d.H-T)/2,6],c:[none,none,none,none]},
+      {id:'fr',name:'前板',role:'front',posture:'front',w:span,h:60,bw:60,la:'w',
+        pos:[cx,42,75-T/2],c:[none,none,none,none]},
+      back('bk','背板',d.W,d.H-60) ]; } },
+};
+
+/* =========================================================
+   3) 中に入れてみる物（寸法は実物に合わせて直せます）
+   ========================================================= */
+/* many … 何十個も持っているのが ふつうの物（何冊入るかを言ってよい）
+   few  … ふつう1〜数個しか持っていない物（「30台入ります」は おかしいので言わない）
+   ok   … few の物が 1個おさまったときの言い方 */
+const REF_KINDS={
+  plush:{label:'ぬいぐるみ',shape:'blob',w:200,d:150,h:250,color:0xe9a3b4,mode:'stand',
+         many:false,few:1,ok:'ぬいぐるみが そのまま入ります'},
+  text :{label:'教科書',    shape:'book',w: 10,d:210,h:257,color:0x6d9cc4,mode:'stand',many:true},
+  bunko:{label:'文庫本',    shape:'book',w: 15,d:105,h:148,color:0xc8a06a,mode:'stand',many:true},
+  mag  :{label:'雑誌',      shape:'book',w: 12,d:210,h:297,color:0xb08fc0,mode:'stand',many:true},
+  comic:{label:'コミックス',shape:'book',w: 12,d:112,h:174,color:0x84b58a,mode:'stand',many:true},
+  /* 調味料ポット（角型・ふたにスプーンが付くタイプ）68×95×155mm の実物を参考に */
+  pot  :{label:'調味料ポット',shape:'pot',w: 70,d: 95,h:155,color:0xf2efe8,
+         many:false,few:4,ok:'調味料ポットが そのまま置けます'},
+  soy  :{label:'しょうゆさし',shape:'pot',w: 68,d: 68,h:125,color:0x8c5b3f,
+         many:false,few:2,ok:'しょうゆさしが そのまま置けます'},
+  /* 500mLのペットボトルは だいたい 直径66・高さ210mm */
+  pet  :{label:'ペットボトル',shape:'bottle',w: 66,d: 66,h:210,color:0x8ed4c6,
+         many:false,few:3,ok:'ペットボトルが 立てて入ります'},
+  /* Nintendo Switch 2（Joy-Con 2をつけた状態）116×272×厚さ13.9mm。
+     ここでは短いほうを下にして立てた向きで置く */
+  sw2  :{label:'Switch2',   shape:'game',w: 14,d:116,h:272,color:0x333a45,mode:'stand',
+         many:false,few:1,ok:'Switch2を 立てて入れられます'},
+};
+
+/* =========================================================
+   4) 状態
+   ========================================================= */
+const state={ work:'A', corners:{}, off:{}, refs:[], nextRef:1, sel:null, selKind:'part',
+  showNails:false, showDim:false, showNames:true, showEnds:false, room:false, scene:'desk',
+  nestX:{}, flip:{}, screen:'main', drawZoom:null,
+  quiz:null, reco:null, refFull:null, // そうだんの答え・おすすめ作品・入りきらなかった物
+  warned:false,        // 「材料の右はしが余っている」に一度OKしたか
+  who:'',              // 名前（説明書に印刷する）
+  dims:{},             // スライダーで変えた寸法（作品を選びなおすとまっさら）
+  comment:'',          // オリジナル寸法にした理由（けがきへ行く前に必要）
+  hole:null,           // ケーブルの穴 {id:板のid, x:板の左端からの中心位置mm}（作品に1つ）
+  handle:false,        // 側板に手を入れる穴をくりぬくか
+  handleY:40 };        // 手穴の中心が、側板の上端から何mm下か
+const $=id=>document.getElementById(id);
+
+/* =========================================================
+   4.5) 穴（ケーブルの穴・手を入れる穴）
+   ケーブルの穴は φ25 固定。底板・棚板・天板だけ、作品に1つ。
+   手を入れる穴は 100×30mm のトラック形。左右の側板に同じ高さで。
+   ふた（天板）のある作品では選べない。作品例Gでは後付けの取っ手が消える。
+   ========================================================= */
+const HOLE_D=25, HOLE_R=HOLE_D/2;
+const HAND_W=100, HAND_H=30, HAND_R=HAND_H/2, HAND_EDGE=20;
+function lidWork(key=state.work){ return WORKS[key].make(defDims(key)).some(p=>p.id==='tp'); }
+function handleOK(key=state.work){
+  return !lidWork(key) && WORKS[key].make(defDims(key)).some(p=>p.id==='L');
+}
+function handleOn(){ return state.handle && handleOK(); }
+/* ---- 寸法（スライダー） ---- */
+function defDims(key){ const d={}; WORKS[key].dims.forEach(t=>d[t.k]=t.def); return d; }
+function dimsOf(key=state.work){
+  const d=defDims(key);
+  if(key===state.work) for(const k in state.dims) if(k in d) d[k]=state.dims[k];
+  return d;
+}
+function isOriginal(key=state.work){
+  if(key!==state.work) return false;
+  const d=dimsOf(key), f=defDims(key);
+  return WORKS[key].dims.some(t=>d[t.k]!==f[t.k]);
+}
+function outer(key=state.work){ const d=dimsOf(key);
+  return {W:Math.round(d.W), D:WORKS[key].D, H:Math.round(d.H)}; }
+function baseParts(key=state.work){
+  const ps=WORKS[key].make(key===state.work?dimsOf(key):defDims(key));
+  /* 手穴をくりぬくと、後付けの取っ手（作品例G）は要らなくなる */
+  return (handleOn() && key===state.work) ? ps.filter(p=>p.role!=='part') : ps;
+}
+/* ケーブルの穴をあけられる板（底板・棚板・天板） */
+function holeParts(key=state.work){ return baseParts(key).filter(p=>p.posture==='flat'); }
+function handleRange(p){ return {lo:HAND_R+HAND_EDGE, hi:p.h-HAND_R-HAND_EDGE}; }
+/* ケーブルの穴が動ける範囲（板の端から25mm以上あける・5mm刻み） */
+function cableRange(p){ return {lo:25, hi:Math.max(25,Math.floor((p.w-25)/5)*5)}; }
+/* その板にあける穴を「板の面の座標」で返す */
+function holeOf(p){
+  if(state.hole && state.hole.id===p.id)
+    return {kind:'cable', cx:state.hole.x, cy:p.h/2, r:HOLE_R};
+  if(handleOn() && (p.id==='L'||p.id==='R'))
+    return {kind:'hand', cx:p.w/2, cy:p.h-state.handleY, hw:HAND_W/2, hh:HAND_H/2, r:HAND_R};
+  return null;
+}
+function holeCount(key=state.work){
+  return (state.hole?1:0) + (handleOn()?2:0);
+}
+function cornersOf(id){
+  if(!state.corners[id]){
+    const p=baseParts().find(q=>q.id===id);
+    state.corners[id]=(p?p.c:[none,none,none,none]).map(c=>({type:c.type,size:c.size}));
+  }
+  return state.corners[id];
+}
+const MARU='①②③④⑤⑥⑦⑧⑨';
+function baseName(n){ return n.replace(/（.*?）/g,'').replace(/[①-⑨]/g,'').replace(/[0-9A-Z]+$/,''); }
+let LBL={}, LBLKEY='';
+function labels(){
+  if(LBLKEY===state.work) return LBL;
+  const g={};
+  for(const q of baseParts()){ const b=baseName(q.name); (g[b]=g[b]||[]).push(q); }
+  LBL={};
+  for(const b in g){
+    const arr=g[b];
+    if(arr.length<2){ LBL[arr[0].id]=b; continue; }
+    arr.sort((x,y)=> x.pos[1]-y.pos[1] || x.pos[0]-y.pos[0] || y.pos[2]-x.pos[2]);
+    arr.forEach((q,i)=> LBL[q.id]=b+MARU[i]);
+  }
+  LBLKEY=state.work; return LBL;
+}
+function parts(){
+  return baseParts().map(p=>{
+    const o=state.off[p.id]||[0,0,0];
+    return {...p, corners:cornersOf(p.id), label:labels()[p.id]||p.name,
+            pos:p.pos.map((v,i)=>v+o[i]), moved:!!(o[0]||o[1]||o[2])};
+  });
+}
+function bbox(p){ const e=extentOf(p);
+  return {id:p.id,min:p.pos.map((v,i)=>v-e[i]/2),max:p.pos.map((v,i)=>v+e[i]/2)}; }
+function refBox(r){ const e=[r.w,r.h,r.d];
+  return {id:r.id,min:r.pos.map((v,i)=>v-e[i]/2),max:r.pos.map((v,i)=>v+e[i]/2)}; }
+function hitBox(a,b,t=0.6){ return [0,1,2].every(i=>a.min[i]<b.max[i]-t && b.min[i]<a.max[i]-t); }
+
+/* =========================================================
+   5) 材料取り（600mmの棒を切り分けるだけ）
+   ========================================================= */
+function nest(ps){
+  const boards=STOCK.map(s=>({...s,placed:[],cursor:0}));
+  /* nestKey が同じ部品は、1枚の切れ端から取る（取っ手など） */
+  const seen=new Set(), items=[];
+  for(const p of ps){
+    if(p.nestKey){ if(seen.has(p.nestKey)) continue; seen.add(p.nestKey); }
+    items.push({id:p.id,label:p.nestLabel||p.label||p.name,len:Math.round(cutLen(p)),bw:p.nestBw||p.bw});
+  }
+  items.sort((a,b)=>b.len-a.len);
+  /* 初めは左から順に並べるだけ。どこに置くかは生徒が決める。 */
+  /* 縦びきはしないので、板はばがぴったり同じ材料にしか置けない */
+  const put=it=>{
+    for(const bd of boards){
+      if(bd.h!==it.bw) continue;
+      const x = bd.cursor ? bd.cursor+KERF : 0;
+      if(x+it.len > bd.w) continue;
+      bd.placed.push({...it,x}); bd.cursor=x+it.len; return true;
+    }
+    return false;
+  };
+  const left=[];
+  for(const it of items) if(!put(it)) left.push(it);
+
+  for(const bd of boards){
+    bd.placed.sort((a,b)=>a.x-b.x);
+    /* 生徒が動かした位置。隣の部品と切りしろの分だけ間を空ける */
+    for(let i=0;i<bd.placed.length;i++){
+      const q=bd.placed[i], mx=state.nestX[q.id];
+      if(mx===undefined) continue;
+      const prev=bd.placed[i-1], next=bd.placed[i+1];
+      const lo = prev ? prev.x+prev.len+KERF : 0;
+      const hi = (next ? next.x-KERF : bd.w) - q.len;
+      q.x = Math.max(lo, Math.min(hi, mx));
+    }
+    bd.placed.sort((a,b)=>a.x-b.x);
+    for(const q of bd.placed){ q.endS=q.x<=0.5; q.endE=q.x+q.len>=bd.w-0.5; }
+    /* 余り（すき間）を全部拾う */
+    bd.gaps=[]; let cur=0;
+    for(const q of bd.placed){ if(q.x-cur>0.5) bd.gaps.push([cur,q.x]); cur=q.x+q.len; }
+    if(bd.w-cur>0.5) bd.gaps.push([cur,bd.w]);
+    bd.rest=Math.round(bd.gaps.reduce((t,g)=>t+(g[1]-g[0]),0));
+  }
+  return {boards,left};
+}
+/* 部品を動かせる範囲（隣の部品と材料の端で押さえる） */
+function nestRange(ps,id){
+  const {boards}=nest(ps);
+  for(const bd of boards){
+    const i=bd.placed.findIndex(q=>q.id===id); if(i<0) continue;
+    const q=bd.placed[i], prev=bd.placed[i-1], next=bd.placed[i+1];
+    return {bd, q, lo: prev?prev.x+prev.len+KERF:0,
+                 hi:(next?next.x-KERF:bd.w)-q.len};
+  }
+  return null;
+}
+
+/* 部品ごとに「製材所が切った端」がどちらかを調べる。
+   生徒が「ひっくり返す」を選んだら、きれいな面は反対の端に移る。 */
+function factoryEnds(ps){
+  const m=new Map();
+  for(const bd of nest(ps).boards) for(const q of bd.placed){
+    let e={s:!!q.endS, e:!!q.endE};
+    if(state.flip[q.id] && (e.s!==e.e)) e={s:e.e, e:e.s};
+    m.set(q.id,e);
+  }
+  return m;
+}
+/* 部品の「切り始めの端」が、組み立てたときどの向きの面になるか */
+function endAxis(p){
+  const lenH=lenAxis(p)==='h';                       // 切った長さが板の縦
+  if(p.posture==='side')  return lenH?{ax:1,s:-1}:{ax:2,s:1};
+  if(p.posture==='flat')  return lenH?{ax:2,s:1}:{ax:0,s:-1};
+  return lenH?{ax:1,s:-1}:{ax:0,s:-1};
+}
+const AXNAME=[['左','右'],['下','上'],['奥','手前']];
+/* どの向きの面が他の板と接しているか */
+function touchSides(ps){
+  const m=new Map(); ps.forEach(p=>m.set(p.id,new Set()));
+  const bs=ps.map(bbox);
+  for(let i=0;i<bs.length;i++) for(let j=i+1;j<bs.length;j++){
+    const a=bs[i],b=bs[j];
+    for(let k=0;k<3;k++){
+      const ov=[0,1,2].filter(t=>t!==k)
+        .every(t=>Math.min(a.max[t],b.max[t])-Math.max(a.min[t],b.min[t])>5);
+      if(!ov) continue;
+      if(Math.abs(a.max[k]-b.min[k])<0.6){ m.get(a.id).add(k+'+'); m.get(b.id).add(k+'-'); }
+      if(Math.abs(b.max[k]-a.min[k])<0.6){ m.get(b.id).add(k+'+'); m.get(a.id).add(k+'-'); }
+    }
+  }
+  return m;
+}
+/* きれいな面が仕事をしているか */
+function endReport(ps){
+  const FE=factoryEnds(ps), TS=touchSides(ps), out=[];
+  for(const p of ps){
+    const f=FE.get(p.id); if(!f||(!f.s&&!f.e)) continue;
+    const {ax,s}=endAxis(p);
+    for(const which of ['s','e']){
+      if(!f[which]) continue;
+      const sign = which==='s' ? s : -s;
+      const key = ax+(sign>0?'+':'-');
+      const b=bbox(p);
+      const onFloor = (ax===1 && sign<0 && b.min[1]<0.6);
+      const joined = TS.get(p.id).has(key);
+      /* ぶつかってはいないが、他の板と面がそろっている＝見た目にきく */
+      const face = sign>0 ? b.max[ax] : b.min[ax];
+      const flush = !joined && ps.some(o=>{
+        if(o.id===p.id) return false;
+        const ob=bbox(o);
+        if(Math.abs((sign>0?ob.max[ax]:ob.min[ax])-face)>0.6) return false;
+        /* 触れていなくても、すぐそばで面がそろっていればよい */
+        return [0,1,2].filter(t=>t!==ax)
+          .every(t=>Math.min(b.max[t],ob.max[t])-Math.max(b.min[t],ob.min[t])>-20);
+      });
+      out.push({ id:p.id, label:p.label, which,
+        where: AXNAME[ax][sign>0?1:0],
+        ok: onFloor||joined, fair: flush,
+        why: onFloor?'置く面に接している'
+            :(joined?'他の板と突き合わせている'
+            :(flush?'他の板と面がそろっている':'何とも接していない')) });
+    }
+  }
+  return out;
+}
+
+/* =========================================================
+   5.5) 釘の位置
+   2枚の板が面で接しているところが「接合」。1か所につき2本打つ。
+   薄いほう（板厚12mm）の板から、相手に向かって打ち込む。
+   ========================================================= */
+function joints(ps){
+  const out=[], bs=ps.map(bbox);
+  for(let i=0;i<bs.length;i++) for(let j=i+1;j<bs.length;j++){
+    const a=bs[i], b=bs[j];
+    for(let k=0;k<3;k++){
+      let dir=0, plane=0;
+      if(Math.abs(a.max[k]-b.min[k])<0.6){ dir=1;  plane=a.max[k]; }   // a→b が＋向き
+      else if(Math.abs(b.max[k]-a.min[k])<0.6){ dir=-1; plane=a.min[k]; }
+      else continue;
+      const ax=[0,1,2].filter(m=>m!==k);
+      const lo=ax.map(m=>Math.max(a.min[m],b.min[m]));
+      const hi=ax.map(m=>Math.min(a.max[m],b.max[m]));
+      if(hi[0]-lo[0]<=5 || hi[1]-lo[1]<=5) continue;
+      const ta=a.max[k]-a.min[k], tb=b.max[k]-b.min[k];
+      const fromA=Math.abs(ta-T) <= Math.abs(tb-T);
+      out.push({k,dir,plane,ax,lo,hi,fromA,a:i,b:j});
+      break;
+    }
+  }
+  return out;
+}
+/* 資料の釘打ち箇所例どおり：
+   幅150mmの板を留めるときは 端から15 / 真ん中(75) / 反対の端から15 の3本。
+   幅60mmの背板は 端から15 / 端から15 の2本で足りる。
+   列は相手の板（厚み12mm）の真ん中＝端から6mmのところ。 */
+const EDGE_MARGIN=15;
+function nailRow(span){
+  if(span>=120) return [EDGE_MARGIN, span/2, span-EDGE_MARGIN];
+  if(span>=44)  return [EDGE_MARGIN, span-EDGE_MARGIN];
+  return [span/2];
+}
+function nailSpots(ps){
+  const out=[];
+  for(const jt of joints(ps)){
+    const len=[jt.hi[0]-jt.lo[0], jt.hi[1]-jt.lo[1]];
+    const L = len[0]>=len[1] ? 0 : 1, O = 1-L;
+    const nd = jt.fromA ? jt.dir : -jt.dir;               // 打ち込む向き
+    const di = jt.fromA ? jt.a : jt.b;                    // 釘を打ち込む側の板
+    const ri = jt.fromA ? jt.b : jt.a;                    // 釘が刺さる側の板
+    for(const t of nailRow(len[L])){
+      const q=[0,0,0];
+      q[jt.k]=jt.plane; q[jt.ax[L]]=jt.lo[L]+t; q[jt.ax[O]]=(jt.lo[O]+jt.hi[O])/2;
+      out.push({pos:q, axis:jt.k, dir:nd, driver:ps[di].id, into:ps[ri].id, bw:ps[di].bw});
+    }
+  }
+  return out;
+}
+/* ワールド座標 → その板の面の座標（左下が0,0） */
+function toFace(p,wp){
+  const dx=wp[0]-p.pos[0], dy=wp[1]-p.pos[1], dz=wp[2]-p.pos[2];
+  let lx,ly;
+  if(p.posture==='side'){ lx=-dz; ly=dy; }
+  else if(p.posture==='flat'){ lx=dx; ly=-dz; }
+  else { lx=dx; ly=dy; }
+  return [lx+p.w/2, ly+p.h/2];
+}
+/* 板の外形を面の座標で点列にする（角の加工こみ） */
+function faceOutline(w,h,cs,seg=12){
+  const lim=Math.min(w,h)/2-0.01;
+  const q=cs.map(c=>c.type==='none'?0:Math.max(0,Math.min(c.size,lim)));
+  const pts=[], arc=(cx,cy,r,a0,a1)=>{
+    for(let i=0;i<=seg;i++){const a=a0+(a1-a0)*i/seg; pts.push([cx+r*Math.cos(a),cy+r*Math.sin(a)]);}};
+  pts.push([q[0],0]); pts.push([w-q[1],0]);
+  if(q[1]) cs[1].type==='round'?arc(w-q[1],q[1],q[1],-Math.PI/2,0):pts.push([w,q[1]]);
+  pts.push([w,h-q[2]]);
+  if(q[2]) cs[2].type==='round'?arc(w-q[2],h-q[2],q[2],0,Math.PI/2):pts.push([w-q[2],h]);
+  pts.push([q[3],h]);
+  if(q[3]) cs[3].type==='round'?arc(q[3],h-q[3],q[3],Math.PI/2,Math.PI):pts.push([0,h-q[3]]);
+  pts.push([0,q[0]]);
+  if(q[0]) cs[0].type==='round'?arc(q[0],q[0],q[0],Math.PI,Math.PI*1.5):pts.push([q[0],0]);
+  return pts;
+}
+
+/* =========================================================
+   5.8) 組み立ての難しさ
+   切る回数や釘の本数ではなく、「その板を、どこで受けてもらえるか」で決まる。
+   ・板の端を、相手の板の「角」に合わせて打つ（側板と底板、背板）
+     … 材料の端どうしを合わせるだけなので、位置は材料が決めてくれる。
+   ・板の端を、相手の板の「面の途中」に突き当てて打つ（棚板・仕切板）
+     … 釘を打つ位置を自分で決め、板が垂直に立つように押さえながら打つ。
+       板の切り口の直角（加工の精度）と、組み立ての精度の両方が出来ばえに出る。
+   ・同じ「面の途中」でも、
+     両端とも受けてもらえる板（左右の側板に挟まる棚板）はまだ易しく、
+     片方の端が自由な板（底板の上に立てる仕切板）は、たおれる向きを自分で決めるので難しい。
+   ========================================================= */
+function assembly(ps){
+  const TS=touchSides(ps), BB=new Map(ps.map(p=>[p.id,bbox(p)]));
+  const info=new Map();
+  for(const p of ps){
+    const ax=endAxis(p).ax, b=BB.get(p.id);
+    const ends=[-1,1].map(sg=>{
+      if(!TS.get(p.id).has(ax+(sg>0?'+':'-'))) return null;
+      const face=sg>0?b.max[ax]:b.min[ax];
+      const other=ps.find(o=>{
+        if(o.id===p.id) return false;
+        const ob=BB.get(o.id);
+        if(Math.abs((sg>0?ob.min[ax]:ob.max[ax])-face)>0.6) return false;
+        return [0,1,2].filter(t=>t!==ax)
+          .every(t=>Math.min(b.max[t],ob.max[t])-Math.max(b.min[t],ob.min[t])>5);
+      });
+      if(!other) return null;
+      const ob=BB.get(other.id);
+      /* 相手の板が両側にはみ出している＝面の真ん中に突き当てている */
+      const interior=[0,1,2].filter(t=>t!==ax)
+        .some(t=> b.min[t]-ob.min[t]>10 && ob.max[t]-b.max[t]>10);
+      return {other:other.id, interior};
+    });
+    info.set(p.id,{ax,ends});
+  }
+  /* 相手の板の「面の途中」に、端を突き当てている板 */
+  const mid=ps.filter(p=>info.get(p.id).ends.some(e=>e&&e.interior));
+  /* そのうち、立てて使う板（端が上下を向いている板） */
+  const stand=mid.filter(p=>info.get(p.id).ax===1);
+  /* 左右（上下）の両方で受けてもらえる板 */
+  const held=mid.filter(p=>{ const f=info.get(p.id); return f.ax!==1 && f.ends[0] && f.ends[1]; });
+  const sand=stand.filter(p=>{ const f=info.get(p.id); return f.ends[0]&&f.ends[1]; });
+  const free=stand.filter(p=>!sand.includes(p));
+  const small=ps.filter(p=>Math.max(p.w,p.h)<80);
+  const dirs=new Set(stand.map(p=>p.posture));
+  const sideOn=ps.filter(q=>{
+    const f=info.get(q.id);
+    return f.ends.some(e=>e&&stand.some(t=>t.id===e.other));
+  });
+  let st=1, why=[];
+  if(!stand.length){
+    why.push(held.length ? '棚板は左右の側板に挟まれる' : '板の端どうしを合わせて打つだけ');
+  }else{
+    st=2; why.push(`面の途中に立てる板が${stand.length}枚`);
+    if(free.length>=3){ st=2.5; why.push('立てる板が3枚以上で、傾きが重なる'); }
+  }
+  if(sand.length){ st=3; why.push('立てた板の上にさらに板が乗る'); }
+  if(small.length){ st=4; why.push('手で押さえにくい小さな部品がある'); }
+  if(dirs.size>=2){ st=4; why.push('向きの違う仕切板がある'); }
+  if(sideOn.length){ st=4; why.push('立てた板の横にも板が付く'); }
+  return {stars:st, why, stand:stand.length, held:held.length, sand:sand.length};
+}
+
+/* =========================================================
+   6) 作業量（切る回数・釘の本数）
+   ========================================================= */
+function workload(key){
+  const ps=(key===state.work)?parts():baseParts(key);
+  const {boards,left}=nest(ps);
+  const cuts=boards.reduce((n,b)=>n+b.placed.length,0);       // 切り分ける回数
+  const corners=ps.reduce((n,p)=>n+(p.corners||p.c).filter(c=>c.type!=='none').length,0);
+  const as=assembly(ps);
+  return {pieces:ps.length, cuts, corners, nails:nailSpots(ps).length,
+          left:left.length, stars:as.stars, why:as.why};
+}
+
+/* =========================================================
+   7) 3Dビュー
+   ========================================================= */
+const stage=$('stage');
+const HAS3D=(typeof THREE!=='undefined');
+let rebuild=()=>{}, fitView=()=>{}, fitRoom=()=>{}, resize=()=>{}, markDirty=()=>{};
+
+if(!HAS3D){
+  stage.innerHTML='<div style="padding:22px;max-width:440px;color:#5a5048;line-height:1.8">'
+   +'<b>3D画面の部品（Three.js）が読み込めませんでした。</b><br>'
+   +'ネットにつながっていないか、学校のネットワークが cdnjs.cloudflare.com を止めている可能性があります。'
+   +'寸法・材料取り・チェックはこのまま使えます。<br><br>'
+   +'対処：three.min.js をこのHTMLと同じ場所に置き、&lt;script src&gt; をその名前に書き換えてください。</div>';
+}
+
+if(HAS3D){
+  const renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  stage.appendChild(renderer.domElement);
+  renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+
+  const scene=new THREE.Scene(); scene.background=new THREE.Color(0xeceff1);
+  const camera=new THREE.PerspectiveCamera(34,1,1,9000);
+  scene.add(new THREE.HemisphereLight(0xffffff,0x9aa3a8,0.95));
+  const s1=new THREE.DirectionalLight(0xffffff,0.5); s1.position.set(300,480,360); scene.add(s1);
+  const s2=new THREE.DirectionalLight(0xffffff,0.24); s2.position.set(-320,200,-260); scene.add(s2);
+  const grid=new THREE.GridHelper(900,36,0xb4bfc6,0xd4dbdf); grid.position.y=-0.5; scene.add(grid);
+  const group=new THREE.Group(); scene.add(group);
+
+  /* =======================================================
+     置き場所の3つの場面（家具のAR体験のかわり）
+     y=0 は いつも「作品を置く面」。机の天板・台所のカウンター・部屋のゆか。
+     場面のものは group に入れないので、クリックの じゃまにならない。
+     ======================================================= */
+  const room=new THREE.Group(); scene.add(room);
+  const SCENEG={};                       // 作った場面をとっておく（使うときに1回だけ作る）
+  let curScene=null;
+  /* 場面はライト計算をしない材質（MeshBasic）にする。そのぶん軽い。 */
+  function panel(g,w,h,color,pos,rot){
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),
+      new THREE.MeshBasicMaterial({color,side:THREE.FrontSide}));
+    m.position.set(pos[0],pos[1],pos[2]);
+    if(rot) m.rotation.set(rot[0]||0,rot[1]||0,rot[2]||0);
+    g.add(m); return m;
+  }
+  function slab(g,w,h,d,color,pos){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshBasicMaterial({color}));
+    m.position.set(pos[0],pos[1],pos[2]); g.add(m); return m;
+  }
+  /* 共通：おくのかべ と ゆか */
+  function shell(g,F,floorColor,wallColor,wallZ){
+    panel(g,3600,2600,floorColor,[0,F,-300],[-Math.PI/2,0,0]);
+    panel(g,3600,2400,wallColor,[0,F+1200,wallZ],[0,0,0]);
+  }
+  /* ① 自分のへや：学習机（100×60cm・高さ70cm） */
+  function makeDesk(){
+    const g=new THREE.Group(), F=-SCENES.desk.top;
+    shell(g,F,0xbcdcaa,0xf6efdd,-DESK.D/2-30);
+    const wz=-DESK.D/2-28;
+    panel(g,1000,820,0x9fd2ef,[0,430,wz]);
+    panel(g,1040,24,0xfaf7ef,[0,20,wz+1]); panel(g,1040,24,0xfaf7ef,[0,840,wz+1]);
+    panel(g,24,860,0xfaf7ef,[-508,430,wz+1]); panel(g,24,860,0xfaf7ef,[508,430,wz+1]);
+    panel(g,16,820,0xfaf7ef,[0,430,wz+1]); panel(g,1000,16,0xfaf7ef,[0,430,wz+1]);
+    panel(g,260,1000,0x8fd3a8,[-640,400,wz+14]); panel(g,260,1000,0x8fd3a8,[640,400,wz+14]);
+    const rod=new THREE.Mesh(new THREE.CylinderGeometry(9,9,1500,10),
+      new THREE.MeshBasicMaterial({color:0x7fa8c9}));
+    rod.rotation.z=Math.PI/2; rod.position.set(0,900,wz+18); g.add(rod);
+    const hw=DESK.W/2, hd=DESK.D/2, LEG=SCENES.desk.top-DESK.T;
+    slab(g,DESK.W,DESK.T,DESK.D,0xf0dcb0,[0,-DESK.T/2,0]);
+    slab(g,24,LEG,DESK.D-40,0xcbb082,[-hw+12,-DESK.T-LEG/2,0]);
+    slab(g,24,LEG,DESK.D-40,0xcbb082,[ hw-12,-DESK.T-LEG/2,0]);
+    slab(g,DESK.W-48,LEG-120,18,0xc0a677,[0,-DESK.T-LEG/2-40,-hd+20]);
+    slab(g,300,LEG-60,DESK.D-60,0xd6bb8c,[hw-175,-DESK.T-(LEG-60)/2,10]);
+    for(let i=0;i<3;i++){
+      slab(g,270,150,14,0xf0e2c2,[hw-175,-DESK.T-110-i*180, hd-32]);
+      slab(g,90,16,10,0xb59a6a,[hw-175,-DESK.T-110-i*180, hd-24]);
+    }
+    const SH=SCENES.desk.shelf;
+    slab(g,DESK.W,20,DESK.SHD,0xead5a8,[0,SH+10,-hd+DESK.SHD/2]);
+    slab(g,20,SH+20,DESK.SHD,0xcbb082,[-hw+10,SH/2,-hd+DESK.SHD/2]);
+    slab(g,20,SH+20,DESK.SHD,0xcbb082,[ hw-10,SH/2,-hd+DESK.SHD/2]);
+    slab(g,DESK.W,260,18,0xe0caa0,[0,SH+150,-hd+9]);
+    const bc=[0xd98b7a,0x86b5d6,0x8fc79a,0xe3c76a,0xb79ed0];
+    for(let i=0;i<5;i++)
+      slab(g,26,190,130,bc[i],[-hw+70+i*34, SH-95, -hd+DESK.SHD/2]);
+    return g;
+  }
+  /* ② 台所：キッチンカウンター（高さ85cm・奥行65cm）と つり戸だな */
+  function makeKitchen(){
+    const g=new THREE.Group(), F=-SCENES.kitchen.top, KD=650, KW=1800;
+    shell(g,F,0xd8d2c6,0xeef2f4,-KD/2-40);
+    /* かべのタイル */
+    for(let i=0;i<7;i++) for(let j=0;j<4;j++)
+      panel(g,190,120,(i+j)%2?0xe4eef2:0xf3f8fa,[-600+i*200,60+j*130,-KD/2-38]);
+    /* カウンター天板・前板・引き出し */
+    slab(g,KW,40,KD,0xe9e6df,[0,-20,0]);
+    slab(g,KW,SCENES.kitchen.top-40,20,0xdfd8cc,[0,-40-(SCENES.kitchen.top-40)/2,KD/2-10]);
+    for(let i=0;i<4;i++){
+      slab(g,400,150,14,0xf0ece2,[-660+i*440,-140,KD/2-2]);
+      slab(g,150,14,10,0xa8a196,[-660+i*440,-125,KD/2+4]);
+    }
+    /* シンク（左）とコンロ（右） */
+    slab(g,520,10,400,0xbfc6cb,[-560,-12,0]);
+    slab(g,500,14,380,0xd7dde1,[-560,-6,0]);
+    const fa=new THREE.Mesh(new THREE.CylinderGeometry(11,11,300,10),
+      new THREE.MeshBasicMaterial({color:0xc2c9ce}));
+    fa.position.set(-560,150,-200); g.add(fa);
+    slab(g,520,8,400,0x33383d,[620,-16,0]);
+    for(const dx of [-120,120]) slab(g,190,10,190,0x1e2226,[620+dx,-10,0]);
+    /* つり戸だな（下のあきは SCENES.kitchen.shelf） */
+    const SH=SCENES.kitchen.shelf;
+    slab(g,KW,22,320,0xf2ece0,[0,SH+11,-KD/2+160]);
+    slab(g,KW,400,22,0xe8e0d2,[0,SH+200,-KD/2+11]);
+    slab(g,KW,26,320,0xf2ece0,[0,SH+400,-KD/2+160]);
+    for(const dx of [-450,0,450]) slab(g,10,390,300,0xdcd4c4,[dx,SH+205,-KD/2+160]);
+    return g;
+  }
+  /* ③ リビング：ゆかに直置き。よこに ローテーブル */
+  function makeFloor(){
+    const g=new THREE.Group();
+    shell(g,0,0xd9c9a8,0xf1ece2,-700);
+    /* ゆかの木目 */
+    for(let i=-8;i<=8;i++)
+      panel(g,3400,4,0xcdba94,[0,1,-300+i*130],[-Math.PI/2,0,0]);
+    /* ラグ */
+    panel(g,1500,1100,0xc9d8e2,[250,2,120],[-Math.PI/2,0,0]);
+    /* ローテーブル（高さ38cm） */
+    const TH=380, TW=900, TD=500, tx=700;
+    slab(g,TW,26,TD,0xd9b98a,[tx,TH-13,60]);
+    for(const sx of [-1,1]) for(const sz of [-1,1])
+      slab(g,50,TH-26,50,0xbe9c6d,[tx+sx*(TW/2-60),(TH-26)/2,60+sz*(TD/2-60)]);
+    /* ソファの一部（おくがわ・小さめに） */
+    slab(g,1300,170,400,0x9fb0bd,[-450,85,-900]);
+    slab(g,1300,300,110,0x8ea2b1,[-450,255,-1050]);
+    /* かべぎわの はば木 */
+    slab(g,3400,70,16,0xe6dfd2,[0,35,-692]);
+    return g;
+  }
+  function sceneOf(k){
+    if(!SCENEG[k]){
+      SCENEG[k]= k==='kitchen'?makeKitchen() : k==='floor'?makeFloor() : makeDesk();
+      room.add(SCENEG[k]);
+    }
+    return SCENEG[k];
+  }
+  function showScene(k){
+    if(curScene===k) return;
+    curScene=k;
+    for(const n in SCENEG) SCENEG[n].visible=false;
+    sceneOf(k).visible=true;
+    markDirty();
+  }
+  const NAILINFO={spots:[],drivers:new Set()};
+  /* 板の呼び名を透過文字で貼る */
+  const labelCache=new Map();
+  function labelTex(text,white){
+    const key=(white?'w:':'')+text;
+    if(labelCache.has(key)) return labelCache.get(key);
+    const ch=[...text], U=140, c=document.createElement('canvas');
+    c.width=U*ch.length; c.height=U;
+    const g=c.getContext('2d');
+    g.font=`700 ${Math.round(U*0.78)}px "Hiragino Sans","Noto Sans JP",system-ui`;
+    g.textAlign='center'; g.textBaseline='middle';
+    g.fillStyle = white ? 'rgba(255,255,255,0.72)' : 'rgba(58,36,14,0.42)';
+    ch.forEach((k,i)=>g.fillText(k,U*i+U/2,U*0.54));
+    const t=new THREE.CanvasTexture(c);
+    const cap=renderer.capabilities;
+    t.anisotropy=(cap&&cap.getMaxAnisotropy)?cap.getMaxAnisotropy():1;
+    labelCache.set(key,{tex:t,aspect:ch.length});
+    return labelCache.get(key);
+  }
+  /* 入れたモノの「いちばん広い面」に名前を貼る。short＝うすい向きの軸 */
+  function addFaceLabel(g,text,e,short,white){
+    const {tex,aspect}=labelTex(text,white);
+    const a=[0,1,2].filter(i=>i!==short);          // 面をつくる2つの軸
+    /* 文字は かならず 横に読む向き（x か z）に流す。たてに流すと読みにくい */
+    const uAx = (short===1) ? (e[0]>=e[2]?0:2) : a.find(i=>i!==1);
+    const vAx = (uAx===a[0])?a[1]:a[0];
+    let pw=e[uAx]*0.78, ph=pw/aspect;
+    if(ph>e[vAx]*0.7){ ph=e[vAx]*0.7; pw=ph*aspect; }
+    const mat=new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false});
+    const off=e[short]/2+0.5;
+    for(const sg of [1,-1]){
+      const me=new THREE.Mesh(new THREE.PlaneGeometry(pw,ph),mat);
+      if(short===2){ me.position.z=off*sg; if(sg<0) me.rotation.y=Math.PI;
+        if(uAx===1) me.rotation.z=Math.PI/2*sg; }
+      else if(short===0){ me.position.x=off*sg; me.rotation.y=Math.PI/2*sg;
+        if(uAx===1) me.rotation.z=Math.PI/2; }
+      else { me.position.y=off*sg; me.rotation.x=-Math.PI/2*sg;
+        if(uAx===2) me.rotation.z=Math.PI/2; }
+      g.add(me);
+    }
+  }
+  function addLabel(g,p){
+    const {tex,aspect}=labelTex(p.label);
+    let pw=p.w*0.82, ph=pw/aspect;
+    if(ph>p.h*0.82){ ph=p.h*0.82; pw=ph*aspect; }
+    const m=new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false});
+    const geo=new THREE.PlaneGeometry(pw,ph);
+    const a=new THREE.Mesh(geo,m); a.position.z= T/2+0.4;
+    const b=new THREE.Mesh(geo,m); b.position.z=-T/2-0.4; b.rotation.y=Math.PI;
+    g.add(a); g.add(b);
+  }
+  /* 製材所が切った木口面を光らせる */
+  const ENDMAT=new THREE.MeshBasicMaterial({color:0x00c853});
+  function addEnds(g,p,f){
+    if(!f) return;
+    const q=p.corners.map(c=>c.type==='none'?0:Math.min(c.size,Math.min(p.w,p.h)/2));
+    const lengthIsH = lenAxis(p)==='h';            // 切った長さが板の縦か
+    const put=(pos,size)=>{
+      const m=new THREE.Mesh(new THREE.BoxGeometry(size[0],size[1],size[2]),ENDMAT);
+      m.position.set(pos[0],pos[1],pos[2]); g.add(m);
+    };
+    if(lengthIsH){
+      if(f.s){ const cut=q[0]+q[1]; put([(q[0]-q[1])/2,-p.h/2-0.9,0],[Math.max(4,p.w-cut),1.8,T]); }
+      if(f.e){ const cut=q[3]+q[2]; put([(q[3]-q[2])/2, p.h/2+0.9,0],[Math.max(4,p.w-cut),1.8,T]); }
+    }else{
+      if(f.s){ const cut=q[0]+q[3]; put([-p.w/2-0.9,(q[0]-q[3])/2,0],[1.8,Math.max(4,p.h-cut),T]); }
+      if(f.e){ const cut=q[1]+q[2]; put([ p.w/2+0.9,(q[1]-q[2])/2,0],[1.8,Math.max(4,p.h-cut),T]); }
+    }
+  }
+  const nailGroup=new THREE.Group(); scene.add(nailGroup);
+  /* 釘は本物の色を真似しない。木の上で一番目立つ蛍光ピンク。 */
+  /* 釘の色は本物を真似しない。幅150の板を留める釘と、幅60の背板を留める釘を色分け。 */
+  /* transparent:true にして「いちばん最後に描く組」に入れる。
+     こうしないと、半透明になった板があとから上に重なって釘が消えてしまう。 */
+  const NAIL={
+    150:new THREE.MeshBasicMaterial({color:0xff10b0, depthTest:false, transparent:true, opacity:1}),
+     60:new THREE.MeshBasicMaterial({color:0x00b7ff, depthTest:false, transparent:true, opacity:1}),
+  };
+  const nailMat=bw=>NAIL[bw]||NAIL[150];
+  /* 本物の釘に近い太さ：軸φ2.1mm・先はとがる。頭は平釘らしく平たいφ4.6mm */
+  const nailShaft=new THREE.CylinderGeometry(0.25,1.05,26,10);
+  const nailHead =new THREE.CylinderGeometry(2.3,2.3,0.9,16);
+  nailShaft.userData.keep=nailHead.userData.keep=true;   // 使い回すので捨てない
+
+  /* ---- 木目 ----
+     板の木目は「600mmの材料から切り取った長さ」の向きに走る。
+     だから 側板は下から上へ縦に、底板・天板・棚板・背板は横に流れる。
+     ExtrudeGeometry のUVは板の面のmmそのままなので、300mmで1枚分に縮めて貼る。 */
+  function grainCanvas(vertical){
+    const S=512, c=document.createElement('canvas'); c.width=c.height=S;
+    const g=c.getContext('2d');
+    g.fillStyle='#ffffff'; g.fillRect(0,0,S,S);
+    if(vertical){ g.translate(S,0); g.rotate(Math.PI/2); }   // 同じ模様を90°回す＝縦の木目
+    let seed=20260914;
+    const rnd=()=>{ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; };
+    for(let i=0;i<30;i++){
+      const y0=rnd()*S, dark=rnd()<0.28;
+      g.strokeStyle = dark ? 'rgba(92,62,30,0.20)' : 'rgba(130,96,56,0.11)';
+      g.lineWidth = dark ? 1.1+rnd()*1.9 : 0.7+rnd()*1.2;
+      const n1=1+Math.floor(rnd()*2), n2=2+Math.floor(rnd()*3);
+      const a1=2+rnd()*6, a2=1+rnd()*3, p1=rnd()*6.283, p2=rnd()*6.283;
+      g.beginPath();
+      for(let x=0;x<=S;x+=4){
+        const u=x/S, y=y0+a1*Math.sin(6.283*n1*u+p1)+a2*Math.sin(6.283*n2*u+p2);
+        x?g.lineTo(x,y):g.moveTo(x,y);
+      }
+      g.stroke();
+    }
+    return c;
+  }
+  function grainTex(vertical){
+    const t=new THREE.CanvasTexture(grainCanvas(vertical));
+    t.wrapS=t.wrapT=THREE.RepeatWrapping;
+    t.repeat.set(1/300,1/300);
+    const cap=renderer.capabilities; t.anisotropy=(cap&&cap.getMaxAnisotropy)?cap.getMaxAnisotropy():1;
+    return t;
+  }
+  const GRAIN={x:grainTex(false), y:grainTex(true)};
+  const TONE={wood:0xd9a86b, sel:0xc2694a, warn:0xcf9aa4};
+  const MATS={}, CLEARMATS=[];
+  function woodMat(dir,kind,clear){
+    const k=dir+'-'+kind+(clear?'-c':'');
+    if(!MATS[k]){
+      MATS[k]=new THREE.MeshLambertMaterial({map:GRAIN[dir],color:TONE[kind],
+        transparent:!!clear, opacity:1, depthWrite:!clear});
+      if(clear) CLEARMATS.push(MATS[k]);
+    }
+    return MATS[k];
+  }
+  function grainDir(p){ return grainVertical(p) ? 'y' : 'x'; }
+  const EDGE=new THREE.LineBasicMaterial({color:0x6b5233,transparent:true,opacity:.5});
+  const orbit={yaw:-0.72,pitch:0.42,dist:800,target:new THREE.Vector3(0,90,0)};
+
+  function applyCam(){ const{yaw,pitch,dist,target}=orbit;
+    camera.position.set(target.x+dist*Math.cos(pitch)*Math.sin(yaw),
+      target.y+dist*Math.sin(pitch), target.z+dist*Math.cos(pitch)*Math.cos(yaw));
+    camera.lookAt(target); }
+  resize=function(){ const w=stage.clientWidth,h=stage.clientHeight; if(!w||!h)return;
+    /* 部屋を出しているときは、ぬる面積が一気に増える。画素を1倍にしてかせぐ */
+    renderer.setPixelRatio(state.room?1:Math.min(devicePixelRatio||1,2));
+    renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); markDirty(); };
+  window.addEventListener('resize',()=>{resize();drawNest();});
+
+  /* 穴を Shape の穴（THREE.Path）にする */
+  function holePath(hl){
+    const P=new THREE.Path();
+    if(hl.kind==='cable'){ P.absarc(hl.cx,hl.cy,hl.r,0,Math.PI*2,true); return P; }
+    const x0=hl.cx-hl.hw+hl.r, x1=hl.cx+hl.hw-hl.r, r=hl.r;   // トラック形
+    P.moveTo(x0,hl.cy-r); P.lineTo(x1,hl.cy-r);
+    P.absarc(x1,hl.cy,r,-Math.PI/2,Math.PI/2,false);
+    P.lineTo(x0,hl.cy+r);
+    P.absarc(x0,hl.cy,r,Math.PI/2,Math.PI*1.5,false);
+    return P;
+  }
+  function shapeOf(w,h,cs,hl){
+    const lim=Math.min(w,h)/2-0.01;
+    const g=cs.map(c=>c.type==='none'?0:Math.max(0,Math.min(c.size,lim)));
+    const s=new THREE.Shape(); s.moveTo(g[0],0); s.lineTo(w-g[1],0);
+    if(g[1]) cs[1].type==='round'?s.absarc(w-g[1],g[1],g[1],-Math.PI/2,0,false):s.lineTo(w,g[1]);
+    s.lineTo(w,h-g[2]);
+    if(g[2]) cs[2].type==='round'?s.absarc(w-g[2],h-g[2],g[2],0,Math.PI/2,false):s.lineTo(w-g[2],h);
+    s.lineTo(g[3],h);
+    if(g[3]) cs[3].type==='round'?s.absarc(g[3],h-g[3],g[3],Math.PI/2,Math.PI,false):s.lineTo(0,h-g[3]);
+    s.lineTo(0,g[0]);
+    if(g[0]) cs[0].type==='round'?s.absarc(g[0],g[0],g[0],Math.PI,Math.PI*1.5,false):s.lineTo(g[0],0);
+    if(hl) s.holes.push(holePath(hl));
+    return s;
+  }
+  /* 穴をつかんで動かすための玉。板の面から少し浮かせて置く */
+  const KNOB=new THREE.SphereGeometry(7,16,12); KNOB.userData.keep=true;
+  const KNOBMAT={cable:new THREE.MeshBasicMaterial({color:0x00c853,depthTest:false}),
+                 hand :new THREE.MeshBasicMaterial({color:0xff8f00,depthTest:false})};
+  function addKnob(g,p,hl){
+    const m=new THREE.Mesh(KNOB,KNOBMAT[hl.kind]); m.renderOrder=998;
+    m.position.set(hl.cx-p.w/2, hl.cy-p.h/2, T/2+7);
+    m.userData={kind:'hole',id:p.id,which:hl.kind};
+    g.add(m);
+  }
+
+  /* 作り直すたびに古い形をGPUから捨てる（材質・木目・文字は使い回すので残す） */
+  function clearGroup(gr){
+    while(gr.children.length){
+      const c=gr.children[0]; gr.remove(c);
+      c.traverse(o=>{ const g=o.geometry;
+        if(g && g.dispose && !(g.userData&&g.userData.keep)) g.dispose(); });
+    }
+  }
+  rebuild=function(ps,refs,bad){
+    clearGroup(group); clearGroup(nailGroup);
+    NAILINFO.spots=state.showNails?nailSpots(ps):[];
+    NAILINFO.drivers=new Set(NAILINFO.spots.map(n=>n.driver));
+    for(const n of NAILINFO.spots){
+      const g=new THREE.Group(), m=nailMat(n.bw);
+      const shaft=new THREE.Mesh(nailShaft,m), head=new THREE.Mesh(nailHead,m);
+      shaft.position.y=1; head.position.y=-13;          // 頭は打ち込む側の板の外に少し出す
+      shaft.renderOrder=9998; head.renderOrder=9999;    // 板に隠れず必ず見えるように
+      g.add(shaft); g.add(head);
+      if(n.axis===0) g.rotation.z = n.dir>0 ? -Math.PI/2 :  Math.PI/2;
+      if(n.axis===1 && n.dir<0) g.rotation.z = Math.PI;
+      if(n.axis===2) g.rotation.x = n.dir>0 ?  Math.PI/2 : -Math.PI/2;
+      g.position.set(n.pos[0],n.pos[1],n.pos[2]);
+      nailGroup.add(g);
+    }
+    const FE=state.showEnds?factoryEnds(ps):null;
+    for(const p of ps){
+      const hl=holeOf(p);
+      const geo=new THREE.ExtrudeGeometry(shapeOf(p.w,p.h,p.corners,hl),
+        {depth:T,bevelEnabled:false,curveSegments:14});
+      geo.translate(-p.w/2,-p.h/2,-T/2);
+      const isSel=(state.selKind==='part'&&p.id===state.sel);
+      const kind=isSel?'sel':(bad.has(p.id)?'warn':'wood');
+      /* 釘モードでは「釘を打ち込む側の板」を透かして、
+         反対側に必ず相手の板があることを見せる */
+      const g=new THREE.Group();
+      g.add(new THREE.Mesh(geo, woodMat(grainDir(p),kind, NAILINFO.drivers.has(p.id))));
+      g.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo,25),EDGE));
+      const r=ROT[p.posture]; g.rotation.set(r[0],r[1],r[2]);
+      g.position.set(p.pos[0],p.pos[1],p.pos[2]);
+      if(state.showNames) addLabel(g,p);
+      if(FE) addEnds(g,p,FE.get(p.id));
+      if(hl && !(hl.kind==='hand'&&p.id==='R')) addKnob(g,p,hl);
+      g.userData={id:p.id,kind:'part'}; group.add(g);
+    }
+    for(const rf of refs){
+      const k=REF_KINDS[rf.kind], isSel=(state.selKind==='ref'&&rf.id===state.sel);
+      const m=new THREE.MeshLambertMaterial({color:isSel?0xe07a5f:k.color,
+        transparent:true,opacity:bad.has(rf.id)?.5:.85});
+      const g=new THREE.Group();
+      const put=(geo,mat,pos)=>{ const me=new THREE.Mesh(geo,mat||m);
+        if(pos) me.position.set(pos[0]||0,pos[1]||0,pos[2]||0); g.add(me); return me; };
+      /* いまの たて・よこ・高さ から、どの向きに置かれているかを決める。
+         e[0]=よこ(x) e[1]=高さ(y) e[2]=奥(z) */
+      const e=[rf.w,rf.h,rf.d];
+      const ord=[0,1,2].sort((a,b)=>e[b]-e[a]);
+      const LONG=ord[0], SHORT=ord[2];
+      const ax=(i,v)=>{ const a=[0,0,0]; a[i]=v; return a; };
+      const sz=(i,v)=>{ const a=[e[0],e[1],e[2]]; a[i]=v; return a; };
+      const scl=(i,f)=>{ const a=[e[0],e[1],e[2]]; a[i]*=f; return a; };
+
+      if(k.shape==='blob'){
+        /* ぬいぐるみ：体・頭・耳・目。いちばん長い向きを「せ」にする */
+        const c=new THREE.Group();
+        const H=e[LONG], W=Math.min(e[ord[1]],e[SHORT]), D=Math.max(e[ord[1]],e[SHORT]);
+        const ball=(sx,sy,sz2,y,x,z,mat)=>{
+          const geo=new THREE.SphereGeometry(0.5,16,12); geo.scale(sx,sy,sz2);
+          const me=new THREE.Mesh(geo,mat||m); me.position.set(x||0,y,z||0); c.add(me); return me; };
+        const eye=new THREE.MeshLambertMaterial({color:isSel?0x7a2f1b:0x3b2a22});
+        const pale=new THREE.MeshLambertMaterial({color:isSel?0xf0b9a6:0xfdf2ea,
+          transparent:true,opacity:bad.has(rf.id)?.5:.95});
+        ball(W*0.98,H*0.50,D*0.98, -H*0.24);                       // 体
+        ball(W*0.60,H*0.16,D*0.46, -H*0.30, 0, D*0.28, pale);      // おなか
+        ball(W*0.92,H*0.42,D*0.88,  H*0.24);                       // 頭
+        ball(W*0.26,H*0.14,D*0.24,  H*0.42, -W*0.34);              // 耳
+        ball(W*0.26,H*0.14,D*0.24,  H*0.42,  W*0.34);              // 耳
+        ball(W*0.12,H*0.06,D*0.10,  H*0.26, -W*0.22, D*0.40, eye); // 目
+        ball(W*0.12,H*0.06,D*0.10,  H*0.26,  W*0.22, D*0.40, eye);
+        ball(W*0.34,H*0.10,D*0.16,  H*0.12, 0, D*0.40, pale);      // 口もと
+        if(LONG===0) c.rotation.z=-Math.PI/2;
+        if(LONG===2) c.rotation.x= Math.PI/2;
+        g.add(c);
+      }else if(k.shape==='bottle'){
+        /* ペットボトル：いちばん長い向きを ボトルの軸にする */
+        const c=new THREE.Group();
+        const H=e[LONG], r=Math.min(e[ord[1]],e[SHORT])/2;
+        const cyl=(r1,r2,h,y,mat)=>{ const me=new THREE.Mesh(
+          new THREE.CylinderGeometry(r1,r2,h,18),mat||m); me.position.y=y; c.add(me); };
+        cyl(r,r,H*0.70,-H/2+H*0.35);
+        cyl(r*0.34,r,H*0.18,-H/2+H*0.79);
+        cyl(r*0.34,r*0.34,H*0.06,-H/2+H*0.91);
+        cyl(r*0.40,r*0.40,H*0.06,-H/2+H*0.97,
+          new THREE.MeshLambertMaterial({color:isSel?0xe07a5f:0x3f7fc4}));
+        cyl(r*1.02,r*1.02,H*0.26,-H/2+H*0.40,                        // ラベル
+          new THREE.MeshLambertMaterial({color:isSel?0xe07a5f:0xf7f3e8}));
+        if(LONG===0) c.rotation.z=-Math.PI/2;
+        if(LONG===2) c.rotation.x= Math.PI/2;
+        g.add(c);
+      }else if(k.shape==='pot'){
+        /* 調味料の容器：本体・ふた・ふたに付くスプーンの柄 */
+        const H=e[1], bw=e[0], bd=e[2];
+        put(new THREE.BoxGeometry(bw,H*0.80,bd),null,[0,-H*0.10,0]);
+        put(new THREE.BoxGeometry(bw*1.06,H*0.13,bd*1.06),
+          new THREE.MeshLambertMaterial({color:isSel?0xe07a5f:0xcfd6da,
+            transparent:true,opacity:.95}),[0,H*0.36,0]);
+        put(new THREE.BoxGeometry(bw*0.16,H*0.26,bd*0.12),
+          new THREE.MeshLambertMaterial({color:isSel?0xe07a5f:0xb9c2c8}),
+          [bw*0.22,H*0.50,0]);
+        put(new THREE.BoxGeometry(bw*0.5,H*0.16,bd*0.5),
+          new THREE.MeshLambertMaterial({color:isSel?0xe07a5f:0xe9eef0,
+            transparent:true,opacity:.7}),[0,-H*0.10,bd*0.5+0.6]);
+      }else if(k.shape==='game'){
+        /* Switch2：うすい向きが画面。長い向きの両はしがJoy-Con 2 */
+        put(new THREE.BoxGeometry(e[0],e[1],e[2]));
+        const scr=scl(ord[1],0.86); scr[SHORT]=2.4; scr[LONG]=e[LONG]*0.80;
+        put(new THREE.BoxGeometry(scr[0],scr[1],scr[2]),
+          new THREE.MeshLambertMaterial({color:isSel?0xe07a5f:0x6f9fc4,transparent:true,opacity:.9}),
+          ax(SHORT,e[SHORT]/2+0.6));
+        const jc=c2=>new THREE.MeshLambertMaterial({color:isSel?0xe07a5f:c2});
+        const band=sz(LONG,e[LONG]*0.13);
+        band[SHORT]+=1.2;
+        put(new THREE.BoxGeometry(band[0],band[1],band[2]),jc(0x2f6fb5),ax(LONG, e[LONG]*0.435));
+        put(new THREE.BoxGeometry(band[0],band[1],band[2]),jc(0xc2413a),ax(LONG,-e[LONG]*0.435));
+        addFaceLabel(g,k.label,e,SHORT,true);
+      }else{
+        const geo=new THREE.BoxGeometry(e[0],e[1],e[2]); put(geo);
+        g.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+          new THREE.LineBasicMaterial({color:0x2f3a44,transparent:true,opacity:.35})));
+        addFaceLabel(g,k.label,e,SHORT,false);
+      }
+      g.position.set(rf.pos[0],rf.pos[1],rf.pos[2]);
+      g.userData={id:rf.id,kind:'ref'}; group.add(g);
+    }
+  };
+
+  fitRoom=function(){
+    const bs=parts().map(bbox);
+    const top=bs.length?Math.max(...bs.map(b=>b.max[1])):200;
+    const fl=(state.scene==='floor');
+    orbit.target.set(0,Math.min(top*(fl?0.45:0.55),260),0);
+    orbit.yaw=-0.55; orbit.pitch=fl?0.34:0.17;
+    const r=Math.max(DESK.W,DESK.D)*(fl?0.62:0.50);
+    const vf=camera.fov*Math.PI/180, hf=2*Math.atan(Math.tan(vf/2)*Math.max(.4,camera.aspect));
+    orbit.dist=r/Math.sin(Math.min(vf,hf)/2)*1.25;
+  };
+  fitView=function(){
+    const bs=[...parts().map(bbox),...state.refs.map(refBox)]; if(!bs.length)return;
+    const lo=[0,1,2].map(i=>Math.min(...bs.map(b=>b.min[i])));
+    const hi=[0,1,2].map(i=>Math.max(...bs.map(b=>b.max[i])));
+    orbit.target.set((lo[0]+hi[0])/2,(lo[1]+hi[1])/2,(lo[2]+hi[2])/2);
+    const r=Math.max(60,Math.hypot(hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2])/2);
+    const vf=camera.fov*Math.PI/180, hf=2*Math.atan(Math.tan(vf/2)*Math.max(.4,camera.aspect));
+    orbit.dist=r/Math.sin(Math.min(vf,hf)/2)*1.16;
+  };
+
+  const ray=new THREE.Raycaster(), ndc=new THREE.Vector2(); let drag=null;
+  function toN(e){ const r=renderer.domElement.getBoundingClientRect();
+    ndc.x=((e.clientX-r.left)/r.width)*2-1; ndc.y=-((e.clientY-r.top)/r.height)*2+1; }
+  function hitObj(e){ toN(e); ray.setFromCamera(ndc,camera);
+    const h=ray.intersectObjects(group.children,true)[0]; if(!h)return null;
+    let o=h.object; while(o&&!o.userData.kind) o=o.parent; return o?o.userData:null; }
+  function onPlane(e,y){ toN(e); ray.setFromCamera(ndc,camera);
+    const d=ray.ray.direction,o=ray.ray.origin;
+    if(Math.abs(d.y)<1e-4) return null; const t=(y-o.y)/d.y;
+    return t<0?null:[o.x+d.x*t,y,o.z+d.z*t]; }
+  /* 立っている板の面（x＝一定）との交点。手穴を上下に動かすのに使う */
+  function onPlaneX(e,x){ toN(e); ray.setFromCamera(ndc,camera);
+    const d=ray.ray.direction,o=ray.ray.origin;
+    if(Math.abs(d.x)<1e-4) return null; const t=(x-o.x)/d.x;
+    return t<0?null:[x,o.y+d.y*t,o.z+d.z*t]; }
+  /* 3D画面で穴をつかんで動かす */
+  function moveHole(e,which){
+    const sn=v=>Math.round(v/5)*5;
+    if(which==='cable'){
+      const p=parts().find(q=>q.id===state.hole.id); if(!p) return;
+      const w=onPlane(e,p.pos[1]+T/2); if(!w) return;
+      const rg=cableRange(p);
+      state.hole.x=Math.max(rg.lo,Math.min(rg.hi,sn(w[0]-p.pos[0]+p.w/2)));
+    }else{
+      const p=parts().find(q=>q.id==='L'); if(!p) return;
+      const w=onPlaneX(e,p.pos[0]); if(!w) return;
+      const rg=handleRange(p), cy=Math.max(rg.lo,Math.min(rg.hi,w[1]-p.pos[1]+p.h/2));
+      state.handleY=Math.max(p.h-rg.hi,Math.min(p.h-rg.lo,sn(p.h-cy)));
+    }
+    refresh();
+  }
+
+  function startMove(e,kind,id){
+    const rf=kind==='ref'?state.refs.find(r=>r.id===id):null;
+    const pp=kind==='part'?parts().find(x=>x.id===id):null;
+    const y=rf?rf.pos[1]:(pp?pp.pos[1]:0);
+    return {mode:'move',kind,id,up:e.shiftKey,planeY:y,from:onPlane(e,y),sy:e.clientY,
+            base: rf?[...rf.pos]:[...(state.off[id]||[0,0,0])]};
+  }
+  renderer.domElement.addEventListener('pointerdown',e=>{
+    renderer.domElement.setPointerCapture(e.pointerId);
+    const h=hitObj(e);
+    if(h && h.kind==='hole'){ drag={mode:'hole',which:h.which}; moveHole(e,h.which); return; }
+    if(e.button===2){                                  /* 右ドラッグでも動かせる（おまけ） */
+      if(h){ state.sel=h.id; state.selKind=h.kind; refresh(); }
+      if(state.sel) drag=startMove(e,state.selKind,state.sel);
+      return;
+    }
+    /* 普通の左ボタン：入れたモノの上をつかんだら、そのモノを動かす。
+       それ以外（板や空白）は視点をまわす。 */
+    if(h && h.kind==='ref'){
+      if(state.sel!==h.id||state.selKind!=='ref'){ state.sel=h.id; state.selKind='ref'; refresh(); }
+      drag=startMove(e,'ref',h.id);
+      return;
+    }
+    drag={mode:'orbit',x:e.clientX,y:e.clientY,yaw:orbit.yaw,pitch:orbit.pitch,moved:false,hit:h};
+  });
+  renderer.domElement.addEventListener('pointermove',e=>{
+    if(!drag) return;
+    if(drag.mode==='hole'){ moveHole(e,drag.which); return; }
+    if(drag.mode==='orbit'){
+      const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
+      if(Math.abs(dx)+Math.abs(dy)>4) drag.moved=true;
+      orbit.yaw=drag.yaw-dx*0.008;
+      orbit.pitch=Math.max(-1.45,Math.min(1.45,drag.pitch+dy*0.006)); return;
+    }
+    /* ドラッグのとちゅうで Shift を押しても上下に切りかわるようにする */
+    if(e.shiftKey!==drag.up){
+      const cur = drag.kind==='ref' ? state.refs.find(r=>r.id===drag.id).pos
+                                    : (state.off[drag.id]||[0,0,0]);
+      const yNow = drag.kind==='ref' ? cur[1]
+                 : (parts().find(x=>x.id===drag.id)||{pos:[0,0,0]}).pos[1];
+      drag.up=e.shiftKey; drag.base=[...cur]; drag.sy=e.clientY;
+      drag.planeY=yNow; drag.from=onPlane(e,yNow);
+    }
+    const sn=v=>Math.round(v/5)*5; let d;
+    if(drag.up) d=[0,sn(-(e.clientY-drag.sy)*(orbit.dist/800)*1.2),0];
+    else{ const n=onPlane(e,drag.planeY);
+      if(!n||!drag.from) return; d=[sn(n[0]-drag.from[0]),0,sn(n[2]-drag.from[2])]; }
+    if(drag.kind==='ref'){ const rf=state.refs.find(r=>r.id===drag.id); if(!rf)return;
+      rf.pos=drag.base.map((v,i)=>v+d[i]); rf.pos[1]=Math.max(rf.h/2,rf.pos[1]); rf.inside=false; }
+    else state.off[drag.id]=drag.base.map((v,i)=>v+d[i]);
+    refresh();
+  });
+  renderer.domElement.addEventListener('pointerup',e=>{
+    if(drag&&drag.mode==='orbit'&&!drag.moved){
+      const h=drag.hit||hitObj(e);
+      if(h){ state.sel=h.id; state.selKind=h.kind; }
+      else if(state.selKind==='ref'){ state.selKind='part'; state.sel=parts()[0].id; }
+      refresh();
+    } drag=null;
+  });
+  renderer.domElement.addEventListener('wheel',e=>{ e.preventDefault();
+    orbit.dist=Math.max(120,Math.min(3500,orbit.dist*(1+Math.sign(e.deltaY)*.12)));
+  },{passive:false});
+
+  /* 入れたモノを選んでいるとき、矢印キーで5mmずつ動かす（タッチパッドの補助） */
+  window.addEventListener('keydown',e=>{
+    const t=e.target, tag=t&&t.tagName;
+    if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;   // 文字を打っている最中は何もしない
+    if(state.selKind!=='ref') return;
+    const rf=state.refs.find(r=>r.id===state.sel); if(!rf) return;
+    const K={ArrowLeft:[-5,0,0],ArrowRight:[5,0,0],ArrowUp:[0,0,-5],ArrowDown:[0,0,5]};
+    const U={ArrowUp:[0,5,0],ArrowDown:[0,-5,0]};
+    if(e.key==='Delete'||e.key==='Backspace'){          // 消す
+      e.preventDefault();
+      state.refs=state.refs.filter(r=>r.id!==rf.id);
+      state.selKind='part'; state.sel=baseParts()[0].id; refresh(); return;
+    }
+    const d=(e.shiftKey&&U[e.key])||K[e.key]; if(!d) return;
+    e.preventDefault();
+    rf.pos=rf.pos.map((v,i)=>v+d[i]); rf.pos[1]=Math.max(rf.h/2,rf.pos[1]); rf.inside=false; refresh();
+  });
+
+  const VIEWS={iso:[-0.72,0.42],front:[0,0.02],side:[Math.PI/2,0.02],top:[0,1.44]};
+  document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{
+    if(b.dataset.v==='fit'){fitView();return;}
+    if(b.dataset.v==='desk'){ if(!state.room){state.room=true;refresh();} fitRoom(); return; }
+    const v=VIEWS[b.dataset.v]; orbit.yaw=v[0]; orbit.pitch=v[1]; });
+  document.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{
+    orbit.dist=Math.max(120,Math.min(3500,orbit.dist*(b.dataset.z==='in'?.82:1.22))); });
+
+  /* ---- 描くのは「変わったときだけ」 ----
+     ずっと毎秒60回描き直すと、非力なChromebookでは操作までもたつく。
+     カメラが動いたときと、作り直したときだけ描く。
+     釘モードだけは濃さが変わり続けるので、1秒に20回に間引いて描く。 */
+  let dirty=true, lastCam='', lastPulse=0;
+  markDirty=()=>{ dirty=true; };
+  (function loop(){
+    requestAnimationFrame(loop);
+    const o=orbit;
+    const sig=`${o.yaw.toFixed(4)},${o.pitch.toFixed(4)},${o.dist.toFixed(1)},`
+             +`${o.target.x.toFixed(1)},${o.target.y.toFixed(1)},${o.target.z.toFixed(1)}`;
+    if(sig!==lastCam){ lastCam=sig; dirty=true; }
+    if(state.showNails){
+      const now=performance.now();
+      if(now-lastPulse>50){                                   // 1秒に20回まで
+        lastPulse=now;
+        const ph=(Math.sin(now/3000*Math.PI)+1)/2;            // 1往復6秒
+        for(const m of CLEARMATS) m.opacity=0.5+0.5*ph;
+        dirty=true;
+      }
+    }else if(CLEARMATS.some(m=>m.opacity!==1)){
+      for(const m of CLEARMATS) m.opacity=1; dirty=true;
+    }
+    if(!dirty) return;
+    dirty=false;
+    nailGroup.visible = state.showNails;
+    applyCam();
+    /* 下から見るときは部屋を消す（机が作品をかくしてしまうので） */
+    room.visible = state.room && camera.position.y > 5;
+    if(state.room) showScene(state.scene);
+    grid.visible = !state.room;
+    renderer.render(scene,camera);
+  })();
+}
+
+/* =========================================================
+   8) チェック
+   ========================================================= */
+function checkAll(ps,leftOver){
+  const msgs=[],bad=new Set(),boxes=ps.map(bbox);
+  const nm=id=>{ const p=ps.find(x=>x.id===id); if(p)return p.label;
+    const r=state.refs.find(x=>x.id===id); return r?REF_KINDS[r.kind].label:id; };
+
+  if(leftOver&&leftOver.length){
+    msgs.push({lv:'bad',t:`材料が足りません：${leftOver.map(i=>i.label).join('・')}`});
+    leftOver.forEach(i=>bad.add(i.id));
+  }
+  /* 段差（自分で動かした板だけ見る。同じ原因は1回だけ） */
+  const AX=['左右','上下','前後'],seen=new Set();
+  for(let i=0;i<boxes.length;i++) for(let j=i+1;j<boxes.length;j++){
+    if(!ps[i].moved && !ps[j].moved) continue;
+    for(let k=0;k<3;k++){
+      let hit=0;
+      for(const s of ['min','max']){ const d=Math.abs(boxes[i][s][k]-boxes[j][s][k]);
+        if(d>0.5&&d<T-0.5) hit=d; }
+      if(!hit) continue;
+      bad.add(boxes[i].id); bad.add(boxes[j].id);
+      const key=k+'|'+hit.toFixed(1); if(seen.has(key)) continue; seen.add(key);
+      msgs.push({lv:'warn',t:`${nm(boxes[i].id)}と${nm(boxes[j].id)}の${AX[k]}の端が ${hit.toFixed(0)}mm ずれています。段差ができます。`});
+    }
+  }
+  /* 釘の打ち代 */
+  for(const p of ps){
+    if(p.posture==='flat') continue;
+    const cut=[p.corners[2],p.corners[3]].find(c=>c.type!=='none'&&c.size>=5);
+    if(!cut) continue;
+    const pb=bbox(p), rider=boxes.find(q=>q.id!==p.id&&Math.abs(q.min[1]-pb.max[1])<0.6);
+    if(rider){ msgs.push({lv:'warn',
+      t:`${p.label}の上の角を${cut.type==='round'?'丸めた':'斜めに落とした'}ところに${nm(rider.id)}が乗ります。釘が横から出ます。`});
+      bad.add(p.id); }
+  }
+  /* 入れた物がぶつかる */
+  for(const rf of state.refs){
+    const rb=refBox(rf), h=boxes.find(b=>hitBox(rb,b));
+    if(h){ msgs.push({lv:'warn',t:`${REF_KINDS[rf.kind].label}が${nm(h.id)}にぶつかります。入りません。`});
+      bad.add(rf.id); bad.add(h.id); }
+  }
+  /* きれいな面の使い方（両端モードのときだけ言う） */
+  if(state.showEnds){
+    const rp=endReport(ps), waste=rp.filter(r=>!r.ok&&!r.fair);
+    if(!rp.length) msgs.push({lv:'warn',
+      t:'まだ製材所の端を使っていません。材料取り図で部品を材料の端までドラッグしてみましょう。'});
+    for(const r of waste.slice(0,4)){
+      msgs.push({lv:'warn',t:`${r.label}のきれいな面が${r.where}側で、何とも接していません。もったいない使い方です。`});
+      bad.add(r.id);
+    }
+    const good=rp.filter(r=>r.ok||r.fair);
+    if(good.length) msgs.push({lv:'ok',
+      t:`きれいな面を活かせています：${good.map(r=>r.label+'（'+r.where+'）').join('・')}`});
+  }
+  /* 置き場所の たなの下に入るか */
+  if(state.room && ps.length){
+    const sc=SCENES[state.scene]||SCENES.desk;
+    const h=Math.max(...ps.map(p=>bbox(p).max[1]));
+    const w=Math.max(...ps.map(p=>bbox(p).max[0]))-Math.min(...ps.map(p=>bbox(p).min[0]));
+    if(!sc.shelf) msgs.push({lv:'ok',
+      t:`高さ${Math.round(h)}mm・はば${Math.round(w)}mm。${sc.label}なので高さの制限はありません。`});
+    else if(h>sc.shelf) msgs.push({lv:'warn',
+      t:`高さ${Math.round(h)}mmは、${sc.shelfName}の下（${sc.shelf}mm）には入りません。`
+       +'はしに置くことになります。'});
+    else msgs.push({lv:'ok',
+      t:`高さ${Math.round(h)}mm・はば${Math.round(w)}mm。`
+       +`${sc.shelfName}の下（${sc.shelf}mm）に入ります。`});
+  }
+  if(!msgs.length) msgs.push({lv:'ok',t:'問題はありません。'});
+  return {msgs,bad};
+}
+
+/* =========================================================
+   9) 材料取り図
+   ========================================================= */
+const nestCv=$('nestCv');
+let nestHit=[];                       // クリック判定（画面座標→部品）
+/* 材料の上での穴の位置。along＝部品の切り口からの距離、mat＝材料の左端からの距離 */
+function nestHole(ps,q){
+  const p=ps.find(x=>x.id===q.id); if(!p) return null;
+  const hl=holeOf(p); if(!hl) return null;
+  const along=(lenAxis(p)==='h')?hl.cy:hl.cx;
+  return {kind:hl.kind, along:Math.round(along),
+          mat:Math.round(q.x+(state.flip[q.id]?q.len-along:along))};
+}
+/* 円（hs=0）またはトラック形の道を作る。hs＝長いほうの半分、vert＝たてに寝かせる */
+function drawSlot(g,cx,cy,hs,r,vert){
+  g.beginPath();
+  if(hs<=r){ g.arc(cx,cy,r,0,Math.PI*2); return; }
+  const a=hs-r;
+  if(vert){
+    g.moveTo(cx-r,cy-a); g.lineTo(cx-r,cy+a);
+    g.arc(cx,cy+a,r,Math.PI,0,true);
+    g.lineTo(cx+r,cy-a);
+    g.arc(cx,cy-a,r,0,Math.PI,true);
+  }else{
+    g.moveTo(cx-a,cy-r); g.lineTo(cx+a,cy-r);
+    g.arc(cx+a,cy,r,-Math.PI/2,Math.PI/2);
+    g.lineTo(cx-a,cy+r);
+    g.arc(cx-a,cy,r,Math.PI/2,Math.PI*1.5);
+  }
+  g.closePath();
+}
+/* 材料取り図の上で穴を左右にドラッグする（5mm刻み） */
+function moveHoleBy(kind,base,d){
+  const sn=v=>Math.round(v/5)*5;
+  if(kind==='cable'){
+    const p=parts().find(q=>q.id===state.hole.id); if(!p) return;
+    const sgn=state.flip[p.id]?-1:1, rg=cableRange(p);
+    state.hole.x=Math.max(rg.lo,Math.min(rg.hi,sn(base+sgn*d)));
+  }else{
+    const p=parts().find(q=>q.id==='L'); if(!p) return;
+    const rg=handleRange(p), sgn=state.flip['L']?1:-1;    // 右へドラッグ＝板の上へ
+    state.handleY=Math.max(p.h-rg.hi,Math.min(p.h-rg.lo,sn(base+sgn*d)));
+  }
+  refresh();
+}
+function holeNoteText(boards,ps){
+  const out=[];
+  for(const b of boards) for(const q of b.placed){
+    const hl=nestHole(ps,q); if(!hl) continue;
+    out.push(hl.kind==='cable'
+      ? `<span style="color:#00913c">ケーブルの穴：材料${b.id}の左端から<b>${hl.mat}mm</b>・φ${HOLE_D}</span>`
+      : `<span style="color:#c96a00">手を入れる穴：材料${b.id}の左端から<b>${hl.mat}mm</b>・${HAND_W}×${HAND_H}（糸のこ）</span>`);
+  }
+  return out;
+}
+function boardRows(w,h){
+  const labelW=66, tail=50, gapMM=30;
+  const totalMM=STOCK.reduce((t,b)=>t+b.h,0)+gapMM*(STOCK.length-1);
+  const sc=Math.min((w-labelW-tail)/600, (h-6)/totalMM);
+  const ox=labelW+Math.max(0,(w-labelW-tail-600*sc)/2);
+  return {labelW,gapMM,sc,ox};
+}
+function drawNest(){
+  const ps=parts();
+  const {boards,left}=nest(ps);
+  const dpr=Math.min(devicePixelRatio||1,2);
+  const w=nestCv.clientWidth,h=nestCv.clientHeight||90; if(!w) return left;
+  nestCv.width=w*dpr; nestCv.height=h*dpr;
+  const g=nestCv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
+  const {labelW,gapMM,sc,ox}=boardRows(w,h);
+  nestHit=[];
+  g.font='10px system-ui'; let oy=3;
+  for(const b of boards){
+    const bw=b.w*sc, bh=b.h*sc;
+    g.fillStyle='#7b7166';
+    g.fillText(`材料${b.id}`, ox-labelW, oy+bh/2-1);
+    g.fillText(`幅${b.h}`,    ox-labelW, oy+bh/2+10);
+    g.fillStyle='#e7e1d6'; g.fillRect(ox,oy,bw,bh);
+    g.strokeStyle='#d8d0c2'; g.lineWidth=1;
+    for(let y=oy+4;y<oy+bh;y+=6){g.beginPath();g.moveTo(ox,y);g.lineTo(ox+bw,y);g.stroke();}
+    g.strokeStyle='#b8ae9e'; g.strokeRect(ox+.5,oy+.5,bw,bh);
+
+    for(const q of b.placed){
+      const x=ox+q.x*sc, pw=q.len*sc;
+      const sel=(state.selKind==='part'&&q.id===state.sel);
+      g.fillStyle=sel?'#c2694a':'#d9a86b';
+      g.fillRect(x,oy,pw,bh);
+      g.strokeStyle='#6b5233'; g.lineWidth=1; g.strokeRect(x+.5,oy+.5,pw,bh);
+      if(pw>46&&bh>13){ g.fillStyle=sel?'#fff':'#3f3225';
+        g.fillText(`${q.label}`,x+3,oy+bh/2-1); g.fillText(`${q.len}`,x+3,oy+bh/2+10); }
+      else if(pw>26){ g.fillStyle=sel?'#fff':'#3f3225'; g.fillText(`${q.len}`,x+2,oy+bh/2+4); }
+      /* のこぎりの通り道（材料の端でない側にできる） */
+      g.fillStyle='rgba(176,70,60,.30)';
+      if(!q.endS) g.fillRect(x-KERF*sc,oy,KERF*sc,bh);
+      if(!q.endE) g.fillRect(x+pw,oy,KERF*sc,bh);
+      /* 製材所が切った端 */
+      if(state.showEnds){
+        g.fillStyle='#00c853';
+        if(q.endS) g.fillRect(x,oy,Math.max(3,4*sc),bh);
+        if(q.endE) g.fillRect(x+pw-Math.max(3,4*sc),oy,Math.max(3,4*sc),bh);
+      }
+      nestHit.push({id:q.id,x0:x,x1:x+pw,y0:oy,y1:oy+bh,sc,ox,len:q.len});
+      /* 穴（材料の端から中心までの寸法つき） */
+      const hl=nestHole(ps,q);
+      if(hl){
+        const hx=ox+hl.mat*sc, hy=oy+bh/2, cab=hl.kind==='cable';
+        g.save(); g.fillStyle='#f3efe6'; g.strokeStyle=cab?'#00913c':'#c96a00';
+        g.lineWidth=1.4;
+        drawSlot(g,hx,hy,(cab?HOLE_R:HAND_W/2)*sc,(cab?HOLE_R:HAND_R)*sc,!cab);
+        g.fill(); g.stroke();
+        g.strokeStyle='rgba(0,0,0,.45)'; g.lineWidth=.8;
+        g.beginPath(); g.moveTo(hx,oy); g.lineTo(hx,oy+bh); g.stroke();
+        g.restore();
+        nestHit.push({hole:hl.kind,x0:hx-9,x1:hx+9,y0:oy,y1:oy+bh,sc,ox,len:q.len,px:q.x,plen:q.len});
+      }
+    }
+    /* 余り */
+    g.fillStyle='#7b7166'; g.save(); g.textAlign='center';
+    for(const [a1,a2] of b.gaps){
+      const gx=ox+a1*sc, gw=(a2-a1)*sc;
+      if(gw>34){ g.fillText('余り',gx+gw/2,oy+bh/2-1); g.fillText(`${Math.round(a2-a1)}`,gx+gw/2,oy+bh/2+10); }
+    }
+    g.restore();
+    oy+=bh+gapMM*sc;
+  }
+  const hn=holeNoteText(boards,ps);
+  $('nestNote').innerHTML = (left.length
+    ? `／ 取れない板：${left.map(i=>i.label).join('・')}`
+    : (state.showEnds
+        ? `／ <span style="color:#00a344">緑＝製材所が切った端</span>・部品を左右にドラッグすると材料の端でパチッと止まります`
+        : `／ 部品を左右にドラッグできます（赤い帯は切りしろ ${KERF}mm）`))
+    + (hn.length?'<br>'+hn.join('　／　')+'　※穴も左右にドラッグできます':'');
+  return left;
+}
+
+/* --- 材料取り図のドラッグ：材料の端や隣の部品にスナップ --- */
+let nestDrag=null;
+function nestPick(e){
+  const r=nestCv.getBoundingClientRect();
+  const x=e.clientX-r.left, y=e.clientY-r.top;
+  const hit=t=>x>=t.x0&&x<=t.x1&&y>=t.y0&&y<=t.y1;
+  return nestHit.find(t=>t.hole&&hit(t)) || nestHit.find(hit);   // 穴を先に拾う
+}
+nestCv.addEventListener('pointerdown',e=>{
+  const t=nestPick(e); if(!t) return;
+  nestCv.setPointerCapture(e.pointerId);
+  if(t.hole){ nestDrag={hole:t.hole, sc:t.sc, startX:e.clientX,
+                        base:t.hole==='cable'?state.hole.x:state.handleY,
+                        flip:false}; return; }
+  state.sel=t.id; state.selKind='part';
+  const rg=nestRange(parts(),t.id);
+  nestDrag={id:t.id, sc:t.sc, ox:t.ox, len:t.len, startX:e.clientX,
+            base:(t.x0-t.ox)/t.sc, lo:rg?rg.lo:0, hi:rg?rg.hi:600-t.len, bw:rg?rg.bd.w:600};
+  refresh();
+});
+nestCv.addEventListener('pointermove',e=>{
+  if(!nestDrag) return;
+  const d=(e.clientX-nestDrag.startX)/nestDrag.sc;
+  if(nestDrag.hole){ moveHoleBy(nestDrag.hole, nestDrag.base, d); return; }
+  let x=Math.max(nestDrag.lo,Math.min(nestDrag.hi,nestDrag.base+d));
+  /* スナップ：材料の左端・右端・動ける限界 */
+  const SNAP=14;
+  for(const target of [0, nestDrag.bw-nestDrag.len, nestDrag.lo, nestDrag.hi]){
+    if(Math.abs(x-target)<SNAP && target>=nestDrag.lo-0.1 && target<=nestDrag.hi+0.1){ x=target; break; }
+  }
+  state.nestX[nestDrag.id]=Math.round(x);
+  state.warned=false;
+  refresh();
+});
+nestCv.addEventListener('pointerup',()=>{ nestDrag=null; });
+nestCv.addEventListener('pointercancel',()=>{ nestDrag=null; });
+
+/* =========================================================
+   9.5) 寸法図（板1枚を原寸の形で見る）
+   材料の端を基準に、釘の位置を何mmか書く。
+   ========================================================= */
+const dimCv=$('dimCv');
+function drawDim(){
+  if(!state.showDim) return;
+  const ps=parts();
+  const p=(state.selKind==='part'&&ps.find(x=>x.id===state.sel))||ps[0];
+  const dpr=Math.min(devicePixelRatio||1,2);
+  const W=dimCv.clientWidth, H=dimCv.clientHeight; if(!W||!H) return;
+  dimCv.width=W*dpr; dimCv.height=H*dpr;
+  const g=dimCv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
+  g.fillStyle='#fffdf8'; g.fillRect(0,0,W,H);
+
+  /* この板から打ち込む釘を、面の座標に移す */
+  const nameOf=id=>{const q=ps.find(x=>x.id===id);return q?q.label:id;};
+  const mine=nailSpots(ps).filter(n=>n.driver===p.id)
+                          .map(n=>({f:toFace(p,n.pos),bw:n.bw,into:n.into}));
+  const rows=new Map();                       // 横並び（同じ高さ）
+  const cols=new Map();                       // 縦並び（同じ横位置）
+  for(const n of mine){
+    const ky='y'+n.f[1].toFixed(1), kx='x'+n.f[0].toFixed(1);
+    (rows.get(ky)||rows.set(ky,[]).get(ky)).push(n);
+    (cols.get(kx)||cols.set(kx,[]).get(kx)).push(n);
+  }
+  const hRows=[...rows.values()].filter(a=>a.length>1);
+  const used=new Set(hRows.flat());
+  const vCols=[...cols.values()].filter(a=>a.length>1&&a.every(n=>!used.has(n)));
+  vCols.flat().forEach(n=>used.add(n));
+  const singles=mine.filter(n=>!used.has(n));
+
+  const ML=104, MR=176, MT=86, MB=46+hRows.length*26;
+  const s=Math.min((W-ML-MR)/p.w, (H-MT-MB)/p.h);
+  const ox=ML+Math.max(0,(W-ML-MR-p.w*s)/2), oy=MT+Math.max(0,(H-MT-MB-p.h*s)/2);
+  const X=fx=>ox+fx*s, Y=fy=>oy+(p.h-fy)*s;
+  const bottom=oy+p.h*s;
+
+  /* 板 */
+  const out=faceOutline(p.w,p.h,p.corners);
+  g.beginPath(); out.forEach((q,i)=>i?g.lineTo(X(q[0]),Y(q[1])):g.moveTo(X(q[0]),Y(q[1]))); g.closePath();
+  g.fillStyle='#f0dfc4'; g.fill();
+  g.strokeStyle='#7b5c33'; g.lineWidth=1.6; g.stroke();
+  /* 木目 */
+  g.save(); g.clip();
+  g.strokeStyle='rgba(140,104,60,.30)'; g.lineWidth=1;
+  const vert=grainVertical(p);
+  for(let t=8;t<(vert?p.w:p.h);t+=11){
+    g.beginPath();
+    if(vert){ g.moveTo(X(t),Y(0)); g.lineTo(X(t),Y(p.h)); } else { g.moveTo(X(0),Y(t)); g.lineTo(X(p.w),Y(t)); }
+    g.stroke();
+  }
+  g.restore();
+  /* 穴 */
+  const hl=holeOf(p);
+  if(hl){
+    g.save();
+    drawSlot(g,X(hl.cx),Y(hl.cy),(hl.kind==='cable'?hl.r:hl.hw)*s,hl.r*s,false);
+    g.fillStyle='#fffdf8'; g.fill();
+    g.strokeStyle=hl.kind==='cable'?'#00913c':'#c96a00'; g.lineWidth=1.6; g.stroke();
+    g.restore();
+  }
+
+  /* 寸法線のへルパ */
+  g.font='11px system-ui'; g.textAlign='center'; g.textBaseline='middle';
+  const tick=(x,y,v)=>{ g.beginPath();
+    if(v){g.moveTo(x,y-4);g.lineTo(x,y+4);}else{g.moveTo(x-4,y);g.lineTo(x+4,y);} g.stroke(); };
+  const dimH=(x1,x2,y,txt,col='#2a2520')=>{
+    if(Math.abs(x2-x1)<1) return;
+    g.strokeStyle=col; g.lineWidth=1;
+    g.beginPath(); g.moveTo(x1,y); g.lineTo(x2,y); g.stroke(); tick(x1,y,1); tick(x2,y,1);
+    const wd=g.measureText(txt).width+6;
+    g.fillStyle='#fffdf8'; g.fillRect((x1+x2)/2-wd/2,y-7,wd,14);
+    g.fillStyle=col; g.fillText(txt,(x1+x2)/2,y);
+  };
+  const dimV=(y1,y2,x,txt,col='#2a2520')=>{
+    if(Math.abs(y2-y1)<1) return;
+    g.strokeStyle=col; g.lineWidth=1;
+    g.beginPath(); g.moveTo(x,y1); g.lineTo(x,y2); g.stroke(); tick(x,y1,0); tick(x,y2,0);
+    g.save(); g.translate(x,(y1+y2)/2); g.rotate(-Math.PI/2);
+    const wd=g.measureText(txt).width+6;
+    g.fillStyle='#fffdf8'; g.fillRect(-wd/2,-7,wd,14);
+    g.fillStyle=col; g.fillText(txt,0,0); g.restore();
+  };
+  const guide=(x1,y1,x2,y2)=>{ g.save(); g.strokeStyle='#c9c0b2'; g.setLineDash([3,3]); g.lineWidth=1;
+    g.beginPath(); g.moveTo(x1,y1); g.lineTo(x2,y2); g.stroke(); g.restore(); };
+
+  /* 釘 */
+  const NC={150:'#d9007e',60:'#0077c8'};
+  for(const n of mine){
+    g.beginPath(); g.arc(X(n.f[0]),Y(n.f[1]),4.6,0,6.283);
+    g.fillStyle=NC[n.bw]||NC[150]; g.fill();
+    g.strokeStyle='#fff'; g.lineWidth=1.4; g.stroke();
+  }
+
+  /* 横並びの列：列の高さ＋列にそった寸法 */
+  hRows.sort((a,b)=>a[0].f[1]-b[0].f[1]);
+  hRows.forEach((row,i)=>{
+    const fy=row[0].f[1], y=bottom+26+i*26;
+    const col=NC[row[0].bw]||NC[150];
+    guide(X(0),Y(fy),X(p.w),Y(fy));
+    row.sort((a,b)=>a.f[0]-b.f[0]);
+    const xs=[0,...row.map(n=>n.f[0]),p.w];
+    for(let k=0;k<xs.length-1;k++) dimH(X(xs[k]),X(xs[k+1]),y,String(Math.round(xs[k+1]-xs[k])),col);
+    for(const n of row) guide(X(n.f[0]),Y(fy),X(n.f[0]),y);
+    const ns=[...new Set(row.map(n=>nameOf(n.into)))];
+    const into=ns.length>2?ns.slice(0,2).join('・')+'など':ns.join('・');
+    g.save(); g.textAlign='left'; g.fillStyle=col;
+    g.fillText(`→ ${into}へ ${row.length}本`, X(p.w)+10, y); g.restore();
+    /* 端から列までの高さ（下端が近ければ下から、上端が近ければ上から） */
+    const fromBottom = fy <= p.h-fy;
+    dimV(fromBottom?Y(0):Y(p.h), Y(fy), ox-24-i*22, String(Math.round(fromBottom?fy:p.h-fy)), col);
+  });
+
+  /* 縦並びの列 */
+  vCols.sort((a,b)=>a[0].f[0]-b[0].f[0]);
+  vCols.forEach((cl,i)=>{
+    const fx=cl[0].f[0], x=ox+p.w*s+24+i*22;
+    const col=NC[cl[0].bw]||NC[150];
+    guide(X(fx),Y(0),X(fx),Y(p.h));
+    cl.sort((a,b)=>a.f[1]-b.f[1]);
+    const ys=[0,...cl.map(n=>n.f[1]),p.h];
+    for(let k=0;k<ys.length-1;k++) dimV(Y(ys[k]),Y(ys[k+1]),x,String(Math.round(ys[k+1]-ys[k])),col);
+    const fromLeft = fx <= p.w-fx;
+    dimH(fromLeft?X(0):X(p.w), X(fx), bottom+26+hRows.length*26, String(Math.round(fromLeft?fx:p.w-fx)), col);
+  });
+
+  /* 全体の寸法 */
+  dimH(X(0),X(p.w), bottom+26+(hRows.length+(vCols.length?1:0))*26+6, String(Math.round(p.w)));
+  dimV(Y(0),Y(p.h), ox-24-hRows.length*22-18, String(Math.round(p.h)));
+
+  /* 穴の寸法（板の端から中心まで） */
+  if(hl){
+    const col=hl.kind==='cable'?'#00913c':'#c96a00';
+    dimH(X(0),X(hl.cx), Y(hl.cy)+(hl.kind==='cable'?-HOLE_R*s-16:-hl.r*s-16), `${Math.round(hl.cx)}`, col);
+    dimV(Y(0),Y(hl.cy), X(hl.cx)+(hl.kind==='cable'?HOLE_R*s+18:hl.hw*s+18), `${Math.round(hl.cy)}`, col);
+    g.save(); g.textAlign='center'; g.fillStyle=col; g.font='12px system-ui';
+    g.fillText(hl.kind==='cable'?`φ${HOLE_D} ケーブルの穴`:`${HAND_W}×${HAND_H} 手を入れる穴（糸のこ）`,
+      X(hl.cx), Y(hl.cy)+(hl.kind==='cable'?HOLE_R*s+16:hl.r*s+16));
+    g.restore();
+  }
+
+  /* 角の加工 */
+  const CN=['左下','右下','右上','左上'];
+  const cpos=[[0,0],[p.w,0],[p.w,p.h],[0,p.h]];
+  g.textAlign='left';
+  p.corners.forEach((c,i)=>{
+    if(c.type==='none') return;
+    const lx=X(cpos[i][0])+(i===1||i===2?-6:6), ly=Y(cpos[i][1])+(i>=2?-14:14);
+    g.fillStyle='#8a5a2b'; g.textAlign=(i===1||i===2)?'right':'left';
+    const cs=Math.round(Math.min(c.size,Math.min(p.w,p.h)/2));
+    g.fillText(c.type==='round'?`R${cs}`:`${cs}の斜め`, lx, ly);
+  });
+
+  /* 見出し */
+  g.textAlign='left'; g.textBaseline='alphabetic';
+  g.fillStyle='#2a2520'; g.font='600 15px system-ui';
+  g.fillText(`${p.label}`, 12, 58);
+  g.font='11.5px system-ui'; g.fillStyle='#7b7166';
+  g.fillText(`仕上がり 12 × ${p.bw} × ${Math.round(cutLen(p))} mm`, 12, 76);
+  g.textAlign='right';
+  g.fillText(mine.length?'数字は板の端からの距離（mm）':'この板には釘を打ちません（相手の板から打たれます）', W-12, 58);
+  /* 色の見方 */
+  if(mine.length){
+    const leg=[];
+    if(mine.some(n=>n.bw!==60)) leg.push([150,'幅150mmの板を留める釘']);
+    if(mine.some(n=>n.bw===60)) leg.push([60,'幅60mmの背板を留める釘']);
+    g.textAlign='right'; g.font='11px system-ui';
+    leg.forEach(([bw,txt],i)=>{
+      const y=H-14-(leg.length-1-i)*16;
+      g.fillStyle='#7b7166'; g.fillText(txt,W-14,y);
+      const tw=g.measureText(txt).width;
+      g.beginPath(); g.arc(W-14-tw-11,y-4,4.6,0,6.283); g.fillStyle=NC[bw]; g.fill();
+    });
+  }
+}
+
+/* =========================================================
+   9.8) けがき画面（材料取り図だけの大きな画面）
+   ========================================================= */
+const drawCv=$('drawCv');
+let sheetHit=[];
+function drawSheet(){
+  if($('draw').hidden) return;
+  const ps=parts(), {boards}=nest(ps);
+  const zoom=state.drawZoom, list=zoom?boards.filter(b=>b.id===zoom):boards;
+  const dpr=Math.min(devicePixelRatio||1,2);
+  const W=drawCv.clientWidth,H=drawCv.clientHeight; if(!W||!H) return;
+  drawCv.width=W*dpr; drawCv.height=H*dpr;
+  const g=drawCv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
+  g.fillStyle='#fffdf8'; g.fillRect(0,0,W,H);
+  sheetHit=[];
+
+  const LW=98, RW=124, TOP=36, BOT=48;                  // 1枚分の上下の余白
+  const rowH=(H-10)/list.length;
+  const sc=Math.min((W-LW-RW)/600,
+                    (rowH-TOP-BOT)/Math.max(...list.map(b=>b.h)));
+  const FE=factoryEnds(ps);
+  const spots=state.showNails?nailSpots(ps):[];
+  const NC={150:'#d9007e',60:'#0077c8'};
+  const F=zoom?1.25:1;
+  g.textBaseline='middle';
+
+  list.forEach((b,bi)=>{
+    const bw=600*sc, bh=b.h*sc;
+    const ox=LW+Math.max(0,(W-LW-RW-bw)/2);
+    const oy=5+rowH*bi+TOP+Math.max(0,(rowH-TOP-BOT-bh)/2);
+
+    /* 見出し */
+    g.textAlign='left'; g.font=`600 ${13*F}px system-ui`; g.fillStyle='#2a2520';
+    g.fillText(`材料 ${b.id}`, ox-LW, oy-16);
+    g.font=`${11.5*F}px system-ui`; g.fillStyle='#7b7166';
+    g.fillText(`12 × ${b.h} × 600`, ox-LW, oy+1);
+
+    /* 板 */
+    g.fillStyle='#e7e1d6'; g.fillRect(ox,oy,bw,bh);
+    g.strokeStyle='#d8d0c2'; g.lineWidth=1;
+    for(let y=oy+5;y<oy+bh;y+=7){g.beginPath();g.moveTo(ox,y);g.lineTo(ox+bw,y);g.stroke();}
+    g.strokeStyle='#8a8070'; g.lineWidth=1.4; g.strokeRect(ox+.5,oy+.5,bw,bh);
+
+    for(const q of b.placed){
+      const x=ox+q.x*sc, pw=q.len*sc;
+      g.fillStyle='#e3b884'; g.fillRect(x,oy,pw,bh);
+      g.strokeStyle='#6b5233'; g.lineWidth=1.4; g.strokeRect(x+.5,oy+.5,pw,bh);
+      g.fillStyle='#3f3225'; g.textAlign='center';
+      g.font=`600 ${12.5*F}px system-ui`;
+      if(pw>52) g.fillText(q.label, x+pw/2, oy+bh/2-8*F);
+      g.font=`${12*F}px system-ui`;
+      if(pw>34) g.fillText(`${q.len}mm`, x+pw/2, oy+bh/2+8*F);
+      /* のこぎりの通り道 */
+      g.fillStyle='rgba(176,70,60,.32)';
+      if(!q.endS) g.fillRect(x-KERF*sc,oy,KERF*sc,bh);
+      if(!q.endE) g.fillRect(x+pw,oy,KERF*sc,bh);
+      /* 製材所の端 */
+      g.fillStyle='#00c853';
+      if(q.endS) g.fillRect(x,oy,Math.max(3,5*sc),bh);
+      if(q.endE) g.fillRect(x+pw-Math.max(3,5*sc),oy,Math.max(3,5*sc),bh);
+      sheetHit.push({board:b.id,x0:x,x1:x+pw,y0:oy,y1:oy+bh});
+
+      /* 穴 */
+      {
+        const pp=ps.find(t=>t.id===q.id), hl0=pp?holeOf(pp):null;
+        if(hl0){
+          const lenH=lenAxis(pp)==='h', fl=!!state.flip[q.id], cab=hl0.kind==='cable';
+          let along=lenH?hl0.cy:hl0.cx, across=lenH?hl0.cx:hl0.cy;
+          if(fl) along=q.len-along;
+          const hx=x+along*sc, hy=oy+across*sc;
+          g.save();
+          drawSlot(g,hx,hy,(cab?HOLE_R:HAND_W/2)*sc,(cab?HOLE_R:HAND_R)*sc,!cab&&lenH);
+          g.fillStyle='#fffdf8'; g.fill();
+          g.strokeStyle=cab?'#00913c':'#c96a00'; g.lineWidth=1.6; g.stroke();
+          g.setLineDash([4,3]); g.lineWidth=1;
+          g.beginPath(); g.moveTo(hx,oy); g.lineTo(hx,oy+bh); g.stroke();
+          g.setLineDash([]); g.textAlign='center';
+          g.font=`600 ${11.5*F}px system-ui`;
+          const half=(cab?HOLE_R:(lenH?HAND_W/2:HAND_R))*sc;
+          const tag=(txt,ty)=>{ const wd=g.measureText(txt).width+6;
+            g.fillStyle='#fffdf8'; g.fillRect(hx-wd/2,ty-8,wd,16);
+            g.fillStyle=cab?'#00913c':'#c96a00'; g.fillText(txt,hx,ty); };
+          tag(`${Math.round(q.x+along)}`, hy-half-11*F);
+          tag(cab?`φ${HOLE_D}`:`${HAND_W}×${HAND_H}`, hy+half+11*F);
+          g.restore();
+        }
+      }
+      /* 釘の位置 */
+      if(spots.length){
+        const p=ps.find(t=>t.id===q.id);
+        if(p){
+          const lenH=lenAxis(p)==='h', fl=!!state.flip[q.id];
+          for(const n of spots.filter(n=>n.driver===q.id)){
+            const f=toFace(p,n.pos);
+            let along=lenH?f[1]:f[0], across=lenH?f[0]:f[1];
+            if(fl) along=q.len-along;
+            const nx=x+along*sc, ny=oy+across*sc;
+            g.beginPath(); g.arc(nx,ny,Math.max(3,4.4*F),0,6.283);
+            g.fillStyle=NC[n.bw]||NC[150]; g.fill();
+            g.strokeStyle='#fff'; g.lineWidth=1.4; g.stroke();
+          }
+        }
+      }
+    }
+    /* 余り */
+    g.fillStyle='#8a8070'; g.textAlign='center'; g.font=`${11.5*F}px system-ui`;
+    for(const [a1,a2] of b.gaps){
+      const gx=ox+a1*sc, gw=(a2-a1)*sc;
+      if(gw>40) g.fillText(`余り ${Math.round(a2-a1)}`, gx+gw/2, oy+bh/2);
+    }
+
+    /* 下：一つずつの長さ／上：左端からの合計 */
+    const cuts=[0];
+    for(const q of b.placed){ cuts.push(q.x, q.x+q.len); }
+    cuts.push(600);
+    const uniq=[...new Set(cuts.map(v=>Math.round(v)))].sort((a,b)=>a-b);
+    g.strokeStyle='#8a8070'; g.lineWidth=1; g.font=`${11.5*F}px system-ui`;
+    const yb=oy+bh+22, yt=oy-24;
+    for(let i=0;i<uniq.length-1;i++){
+      const x1=ox+uniq[i]*sc, x2=ox+uniq[i+1]*sc;
+      g.beginPath(); g.moveTo(x1,yb); g.lineTo(x2,yb); g.stroke();
+      g.beginPath(); g.moveTo(x1,yb-4); g.lineTo(x1,yb+4);
+      g.moveTo(x2,yb-4); g.lineTo(x2,yb+4); g.stroke();
+      const t=String(uniq[i+1]-uniq[i]);
+      if(x2-x1>22){ const wd=g.measureText(t).width+6;
+        g.fillStyle='#fffdf8'; g.fillRect((x1+x2)/2-wd/2,yb-7,wd,14);
+        g.fillStyle='#2a2520'; g.fillText(t,(x1+x2)/2,yb); }
+    }
+    /* 左端からの合計。数字がぶつかるときは2段に分ける */
+    g.textAlign='center'; let lastR=-1e9;
+    for(const v of uniq){
+      const x1=ox+v*sc, t=String(v), half=g.measureText(t).width/2+4;
+      const up = (x1-half < lastR);
+      const y = up ? yt-13 : yt;
+      if(!up) lastR = x1+half;
+      g.save(); g.strokeStyle='#cfc4b2'; g.setLineDash([3,3]); g.lineWidth=1;
+      g.beginPath(); g.moveTo(x1,y+7); g.lineTo(x1,oy); g.stroke(); g.restore();
+      g.fillStyle='#8a5a2b'; g.fillText(t, x1, y);
+    }
+    g.textAlign='left'; g.fillStyle='#7b7166'; g.font=`${10.5*F}px system-ui`;
+    g.fillText('左端から', ox+bw+28, yt);
+    g.fillText('部品の長さ', ox+bw+28, yb);
+  });
+
+  $('dNail').className=state.showNails?'on':'';
+  $('dsub').innerHTML = (zoom ? `材料${zoom}を大きく表示中` : '板をクリックすると大きくなります')
+    + (isOriginal()?' ／ <b style="color:#b8761c">あなたのオリジナル寸法です（説明書の数字とはちがいます）</b>':'');
+  $('dZoomOut').hidden = !zoom;
+  $('dfoot').innerHTML =
+    '<b>使い方</b>　上の数字が「材料の左端から何mm」。下の数字が「部品1つ分の長さ」。'
+    +'<span style="color:#00a344">緑＝製材所が切った端（そのまま使える）</span>／'
+    +`<span style="color:#b0463c">赤い帯＝のこぎりの通り道（切りしろ${KERF}mm）</span>。`
+    +'けがきは<b>仕上がり線</b>と<b>切断線</b>の2本を引きましょう。'
+    +(isOriginal()&&state.comment
+      ? `<br><span style="color:#b8761c">あなたのオリジナル寸法の理由：${
+          state.comment.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</span>`
+      : '');
+}
+drawCv.addEventListener('click',e=>{
+  const r=drawCv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  if(state.drawZoom){ state.drawZoom=null; drawSheet(); return; }
+  const t=sheetHit.find(h=>x>=h.x0&&x<=h.x1&&y>=h.y0&&y<=h.y1);
+  if(t){ state.drawZoom=t.board; drawSheet(); }
+});
+
+/* =========================================================
+   10) 画面
+   ========================================================= */
+const CLBL=['左下','右下','右上','左上'];
+function buildParts(ps){
+  const list=$('parts'); list.innerHTML='';
+  for(const p of ps){
+    const b=document.createElement('button');
+    b.className=(state.selKind==='part'&&p.id===state.sel)?'on':'';
+    b.innerHTML=`<span>${p.label}${p.moved?' ✎':''}</span><span class="sz">${Math.round(cutLen(p))}×${p.bw}</span>`;
+    b.onclick=()=>{state.sel=p.id;state.selKind='part';refresh();};
+    list.appendChild(b);
+  }
+  buildDims();
+
+  const sel=(state.selKind==='part'&&ps.find(p=>p.id===state.sel))||ps[0];
+  state.sel=state.selKind==='part'?sel.id:state.sel;
+  const cb=$('cbox');
+  cb.innerHTML=`<div style="font-size:11.5px;margin-bottom:4px">「<b>${sel.label}</b>」の角</div>
+   <div class="corners">${[3,2,0,1].map(i=>`
+    <div class="corner"><div class="cl">${CLBL[i]}</div>
+      <select data-t="${i}">
+        <option value="none">加工しない</option>
+        <option value="round">丸くする</option>
+        <option value="chamfer">斜めに落とす</option>
+      </select>
+      <input type="number" data-s="${i}" min="2" max="${CMAX(sel)}" step="1" value="${Math.min(sel.corners[i].size,CMAX(sel))}">
+    </div>`).join('')}</div>
+   <p class="note">板の面を正面から見たときの位置。数字は丸みの半径／切り落とす長さ（mm）。
+     この板では <b>${CMAX(sel)}mm</b> まで（板の短いほうの半分）。</p>
+   <div class="row"><button id="rc">角を説明書どおりに戻す</button>
+   ${state.off[sel.id]?'<button id="ro">位置を戻す</button>':''}</div>`;
+  cb.querySelectorAll('select[data-t]').forEach(s=>{
+    const i=+s.dataset.t; s.value=sel.corners[i].type;
+    s.parentElement.classList.toggle('off',s.value==='none');
+    s.onchange=()=>{cornersOf(sel.id)[i].type=s.value;refresh();};
+  });
+  cb.querySelectorAll('input[data-s]').forEach(inp=>{
+    const i=+inp.dataset.s;
+    inp.onchange=()=>{cornersOf(sel.id)[i].size=
+      Math.max(2,Math.min(CMAX(sel),+inp.value||15));refresh();};
+  });
+  const ro=$('ro'); if(ro) ro.onclick=()=>{delete state.off[sel.id];refresh();};
+  $('rc').onclick=()=>{ delete state.corners[sel.id]; refresh(); };
+
+  /* 製材所が切った端を持つ板だけ、向きを選べるようにする */
+  const eb=$('endBox'), FE=factoryEnds(ps), f=FE.get(sel.id);
+  if(!f||(!f.s&&!f.e)){
+    eb.innerHTML='<p class="note">この板には製材所の端がありません。'
+      +'材料取り図でこの板を材料の端までドラッグすると、きれいな面が手に入ります。</p>';
+  }else if(f.s&&f.e){
+    eb.innerHTML='<p class="note">両端とも製材所の切り口です。ぜいたくな板！</p>';
+  }else{
+    const r2=endReport(ps).find(r=>r.id===sel.id);
+    eb.innerHTML=`<p class="note">いま きれいな面は <b style="color:#00a344">${r2?r2.where:''}側</b>`
+      +`（${r2?r2.why:''}）</p>`
+      +`<div class="row"><button id="flipBtn">ひっくり返す</button></div>`
+      +(r2&&!r2.ok&&!r2.fair?'<p class="note" style="color:#b0463c">何とも接していません。'
+        +'置く面に接する側や、他の板と突き合わせる側に回すと精度が上がります。</p>':'');
+    $('flipBtn').onclick=()=>{ state.flip[sel.id]=!state.flip[sel.id]; refresh(); };
+  }
+}
+
+/* 本体の右横の床に出す。いきなり中に入れると貫通して見えるので。 */
+function restRef(rf){
+  /* 本体の右よこに、すでに出してある物とも重ならないように並べる */
+  const bs=parts().map(bbox);
+  let right=bs.length?Math.max(...bs.map(b=>b.max[0])):0;
+  for(const o of state.refs){ if(o.id===rf.id) continue;
+    right=Math.max(right, o.pos[0]+o.w/2); }
+  rf.pos=[right+50+rf.w/2, rf.h/2, 0];
+}
+function dropRef(rf){
+  const rb=refBox(rf); let fl=0;
+  for(const b of parts().map(bbox)){
+    const over=[0,2].every(i=>rb.min[i]<b.max[i]-1&&b.min[i]<rb.max[i]-1);
+    if(over&&b.max[1]<=rb.min[1]+1) fl=Math.max(fl,b.max[1]);
+  }
+  rf.pos[1]=fl+rf.h/2;
+}
+/* その場所に すでに何か置いてあるか（種類がちがう物とも かさならないように） */
+function slotFree(pos,rf){
+  const a={min:[pos[0]-rf.w/2,pos[1]-rf.h/2,pos[2]-rf.d/2],
+           max:[pos[0]+rf.w/2,pos[1]+rf.h/2,pos[2]+rf.d/2]};
+  for(const o of state.refs){ if(o.id===rf.id) continue;
+    const b=refBox(o);
+    if([0,1,2].every(i=>a.min[i]<b.max[i]-1&&b.min[i]<a.max[i]-1)) return false; }
+  return true;
+}
+/* 作品の中の「まだ空いている場所」をさがす。
+   ① まず ふつうに ならべる位置（きれいに ならぶ）
+   ② そこが ふさがっていたら 2mmずつ ずらして さがす（すき間に入れる） */
+function findSpot(rf){
+  const it=refItem(rf.kind), ps=parts();
+  if(!ps.length) return null;
+  const grid=insideSlots(it).find(s=>slotFree(s,rf));
+  if(grid) return grid;
+  const sideH=Math.max(...ps.map(p=>bbox(p).max[1]));
+  for(const c of compartments(ps)){
+    if(!fitsComp(it,c,sideH)) continue;
+    const rows=(it.mode==='stand')?1:Math.max(1,Math.floor((c.d-4)/(it.d+2)));
+    for(let r=0;r<rows;r++){
+      const z=(it.mode==='stand')? c.z0+it.d/2 : c.z0+2+(r+0.5)*(it.d+2);
+      for(let x=c.x0+2+it.w/2; x<=c.x1-2-it.w/2+0.01; x+=2){
+        const pos=[x, c.y+it.h/2, z];
+        if(slotFree(pos,rf)) return pos;
+      }
+    }
+  }
+  return null;
+}
+function addRef(kind){
+  const k=REF_KINDS[kind], id='r'+(state.nextRef++);
+  const rf={id,kind,w:k.w,d:k.d,h:k.h,pos:[0,0,0],inside:false};
+  /* 寸法の上で入るなら、作品の中の「まだ空いている」場所へ どんどん入れていく。
+     先に入れた別の物（文庫本など）と かさならない場所をさがす */
+  const slot=findSpot(rf);
+  if(slot){ rf.pos=[...slot]; rf.inside=true; }
+  else restRef(rf);
+  state.refs.push(rf); state.sel=id; state.selKind='ref';
+  state.refFull = slot ? null : kind;
+  refresh();
+}
+function clearRefs(){
+  state.refs=[]; state.nextRef=1; state.refFull=null;
+  if(state.selKind==='ref'){ state.sel=null; state.selKind='part'; }
+  refresh();
+}
+function buildRefs(){
+  const add=$('refAdd');
+  add.innerHTML=Object.entries(REF_KINDS).map(([k,v])=>{
+    const cap=refCapacity(k), now=state.refs.filter(r=>r.kind===k&&r.inside).length;
+    /* 本は「何冊まで」と出す。Switch2などは「14台まで」と出すと おかしいので出さない */
+    const cp = !cap ? '入らない'
+      : v.many ? `${now}/${cap}`
+      : now ? `${now}${UNIT[k]||'つ'} 入れた` : 'そのまま入る';
+    return `<button data-r="${k}"${cap&&now>=cap?' class="full"':''}>＋${v.label}`
+      +`<span class="cap">${cp}</span></button>`;
+  }).join('');
+  add.insertAdjacentHTML('beforeend',
+    `<button id="refClear"${state.refs.length?'':' disabled'}>`
+    +`中の物を ぜんぶ出す${state.refs.length?`（${state.refs.length}）`:''}</button>`);
+  add.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>addRef(b.dataset.r));
+  if($('refClear')) $('refClear').onclick=()=>clearRefs();
+  const fu=$('refFull');
+  if(fu){
+    const fk=state.refFull, cap=fk?refCapacity(fk):0;
+    const K=fk?REF_KINDS[fk]:null;
+    fu.innerHTML = !fk ? ''
+      : cap===0
+        ? `<b>${K.label}は この作品には入りません。</b>`
+          +'大きさをかえるか、ほかの作品にしてみましょう。（作品の右よこに出しました）'
+        : `<b>${K.label}は もう入りません。</b>`
+          + (K.many ? `中がからのときは <b>${cap>=10?`10${UNIT[fk]||'つ'}以上`:`${cap}${UNIT[fk]||'つ'}`}</b>入りますが、` : '')
+          +'いまは ほかの物が場所を使っています。（作品の右よこに出しました）';
+  }
+  const list=$('refList'); list.innerHTML='';
+  for(const rf of state.refs){
+    const b=document.createElement('button');
+    b.className=(state.selKind==='ref'&&rf.id===state.sel)?'on':'';
+    b.innerHTML=`<span>${REF_KINDS[rf.kind].label}</span><span class="sz">${rf.w}×${rf.d}×${rf.h}</span>`;
+    b.onclick=()=>{state.sel=rf.id;state.selKind='ref';refresh();};
+    list.appendChild(b);
+  }
+  const box=$('refEdit');
+  const sel=state.selKind==='ref'?state.refs.find(r=>r.id===state.sel):null;
+  if(!sel){ box.innerHTML='<p class="note">入れて、ぶつからないか確かめられます。寸法は実物に合わせて直せます。</p>'; return; }
+  box.innerHTML=`<div class="rsz">
+      <span>横</span><input type="number" id="rw" value="${sel.w}">
+      <span>奥</span><input type="number" id="rd" value="${sel.d}">
+      <span>高さ</span><input type="number" id="rh" value="${sel.h}"></div>
+    <div class="row"><button id="rot1">よこに回す</button>
+      <button id="rot2">前に倒す</button><button id="rot3">横に倒す</button></div>
+    <div class="row"><button id="rst">外へ</button><button id="rdp">下に落とす</button>
+      <button id="rdl">消す</button></div>
+    <p class="note">ドラッグで動かして、中に入るか確かめましょう。
+      向きは3つのボタンで回せます（数字を直接入れてもOK）。</p>`;
+  const up=(k,el)=>el.onchange=()=>{sel[k]=Math.max(5,Math.min(600,+el.value||10));
+    sel.pos[1]=Math.max(sel.h/2,sel.pos[1]); refresh();};
+  up('w',$('rw')); up('d',$('rd')); up('h',$('rh'));
+  const swap=(a,b)=>{ const t=sel[a]; sel[a]=sel[b]; sel[b]=t;
+    sel.pos[1]=sel.h/2; refresh(); };
+  $('rot1').onclick=()=>swap('w','d');      // たての軸で回す
+  $('rot2').onclick=()=>swap('d','h');      // 前に倒す
+  $('rot3').onclick=()=>swap('w','h');      // 横に倒す
+  $('rst').onclick=()=>{restRef(sel);refresh();};
+  $('rdp').onclick=()=>{dropRef(sel);refresh();};
+  $('rdl').onclick=()=>{state.refs=state.refs.filter(r=>r.id!==sel.id);
+    state.selKind='part'; state.sel=baseParts()[0].id; refresh();};
+}
+
+function partTable(ps){
+  const m=new Map();
+  for(const p of ps){
+    const len=Math.round(cutLen(p)), key=p.bw+'x'+len;
+    const base=baseName(p.name);
+    if(!m.has(key)) m.set(key,{names:[],bw:p.bw,len,n:0});
+    const e=m.get(key);
+    if(!e.names.includes(base)) e.names.push(base);
+    e.n++;
+  }
+  return [...m.values()];
+}
+function showTable(ps){
+  $('ptbl').innerHTML=partTable(ps).map(r=>
+    `<tr><td>${r.names.join('・')}</td><td class="n">12×${r.bw}×${r.len}</td><td class="n">${r.n}</td></tr>`
+  ).join('');
+}
+
+/* 材料の右はしにあいている長さ（ここが「まだ大きくできる」ぶん） */
+function tailRest(b){
+  const g=b.gaps.find(a=>a[1]>=b.w-0.5);
+  return g?Math.round(g[1]-g[0]):0;
+}
+/* その寸法で材料に入りきるか（B案：入らないなら止める） */
+function partsFor(dd){
+  const ps=WORKS[state.work].make(dd);
+  return (handleOn()) ? ps.filter(p=>p.role!=='part') : ps;
+}
+function fitsWith(dd){ return nest(partsFor(dd)).left.length===0; }
+function fitsNow(){ return nest(parts()).left.length===0; }
+/* いま実際にどこまで動かせるか。形の限界と、材料の限界の小さいほう。
+   ほかの寸法を小さくすれば、ここは広がる（例：高さを縮めると外はばが伸びる）。 */
+function dimSpan(t,d){
+  const g=dimLim(t,d), cur=clamp(d[t.k],g[0],g[1]);
+  const ok=v=>{ const dd={...d}; dd[t.k]=v; return fitsWith(dd); };
+  const grid=v=>Math.round(v/t.step)*t.step;
+  let hi=g[1];
+  if(!ok(hi)){ let lo=cur, h=hi;
+    while(h-lo>t.step){ const m=grid((lo+h)/2); if(m<=lo||m>=h) break; ok(m)?lo=m:h=m; }
+    hi=lo; }
+  let lo=g[0];
+  if(!ok(lo)){ let l=lo, h=cur;
+    while(h-l>t.step){ const m=grid((l+h)/2); if(m<=l||m>=h) break; ok(m)?h=m:l=m; }
+    lo=h; }
+  return [Math.min(lo,cur), Math.max(hi,cur)];
+}
+/* その大きさにするために、どの寸法をどれだけ変えればよいかを探す */
+function rescue(tried,k){
+  const out=[];
+  for(const t2 of WORKS[state.work].dims){
+    if(t2.k===k) continue;
+    const g=dimLim(t2,tried); let best=null;
+    for(let v=g[0];v<=g[1];v+=t2.step){
+      if(v===tried[t2.k]) continue;              // 変えないのは助けにならない
+      const dd={...tried}; dd[t2.k]=v;
+      if(!fitsWith(dd)) continue;
+      const dist=Math.abs(v-tried[t2.k]);
+      if(!best||dist<best.dist) best={v,dist,t:t2};
+    }
+    if(best) out.push(best);
+  }
+  out.sort((a,b)=>a.dist-b.dist);
+  return out;
+}
+/* その大きさに近くて、材料に入る作品をすすめる */
+function suggestWork(d){
+  let best=null;
+  for(const k of Object.keys(WORKS)){
+    if(k===state.work) continue;
+    const dd=defDims(k);
+    if(nest(WORKS[k].make(dd)).left.length) continue;
+    const sc=Math.abs((dd.W||0)-(d.W||0))+Math.abs((dd.H||0)-(d.H||0));
+    if(!best||sc<best.sc) best={k,sc,dd};
+  }
+  return best;
+}
+/* スライダーを動かす。材料が足りなくなる手前で止める */
+/* 目もりは「説明書の値」を基準にする。そうしないと 177mm が スライダーで出せない */
+function dimLim(t,d){
+  const L=t.lim?t.lim(d):[t.min,t.max];
+  const g=v=>t.def+Math.round((v-t.def)/t.step)*t.step;        // def をふくむ目もりに乗せる
+  let lo=g(Math.max(t.min,L[0])), hi=g(Math.min(t.max,L[1]));
+  if(lo<t.min||lo<L[0]) lo+=t.step;
+  if(hi>t.max||hi>L[1]) hi-=t.step;
+  return [lo,Math.max(lo,hi)];
+}
+/* 寸法を変えたあと、はみ出した値をぜんぶ入れなおす（穴もふくめて） */
+function clampAll(){
+  const W=WORKS[state.work];
+  for(let n=0;n<3;n++){                      // たがいに影響するので数回まわす
+    let ch=false;
+    for(const t of W.dims){
+      const d=dimsOf(), lm=dimLim(t,d), v=d[t.k];
+      const nv=clamp(v,lm[0],lm[1]);
+      if(nv!==v){ state.dims[t.k]=nv; ch=true; }
+    }
+    if(!ch) break;
+  }
+  const ps=WORKS[state.work].make(dimsOf());
+  if(state.hole){
+    const hp=ps.find(q=>q.id===state.hole.id);
+    if(!hp) state.hole=null;
+    else { const rg=cableRange(hp);
+      state.hole.x=clamp(Math.round(state.hole.x/5)*5,rg.lo,rg.hi); }
+  }
+  const L=ps.find(q=>q.id==='L');
+  if(L){ const rg=handleRange(L);
+    state.handleY=clamp(Math.round(state.handleY/5)*5, L.h-rg.hi, L.h-rg.lo); }
+}
+function trySetDim(k,v,quiet){
+  const t=WORKS[state.work].dims.find(a=>a.k===k), lm=dimLim(t,dimsOf());
+  v=clamp(v,lm[0],lm[1]);
+  const had=(k in state.dims), old=state.dims[k];
+  if(dimsOf()[k]===v) return true;
+  state.dims[k]=v;
+  if(fitsNow()){ state.warned=false; clampAll(); refresh(); return true; }
+  if(had) state.dims[k]=old; else delete state.dims[k];
+  if(!quiet) limitDialog(k,v);
+  refresh(); return false;
+}
+/* 「なぜここで止まるのか」を説明する。どこを縮めれば伸ばせるかも一緒に出す。 */
+function limitDialog(k,v){
+  const me=WORKS[state.work].dims.find(a=>a.k===k);
+  const tried={...dimsOf()}; tried[k]=v;
+  const left=nest(partsFor(tried)).left;
+  const boards=nest(parts()).boards;
+  /* 材料が足りないのか、形として ここまでなのか */
+  if(!left.length){
+    const lm=dimLim(me,dimsOf());
+    askModal(`${me.label}は ここまでです`,
+      `<p><b>${me.label}</b>は いま <b>${lm[0]}〜${lm[1]}mm</b> の間で動かせます。`
+      +'これは材料ではなく、<b>作品の形として むりのない範囲</b>です。</p>'
+      +'<p>たとえば 棚板は 天板や底板に近づきすぎると 手が入らず 釘も打てません。'
+      +'仕切板も はしに寄りすぎると 打つ場所がなくなります。</p>'
+      +'<p>もっと動かしたいときは、<b>外はばや高さ を先に変えて</b>ください。'
+      +'入れられる場所そのものが広がります。</p>','わかった','');
+    return;
+  }
+  const rs=rescue(tried,k);
+  let body=`<p><b>${me.label}を${v}mm</b>にすると、`
+    +`<b>${left.map(i=>i.label).join('・')}</b> が600mmの材料から`
+    +'取れなくなります。だからここで止まりました。</p>'
+    +'<p>いま材料の右はしにあいているのは '
+    + boards.map(b=>`材料${b.id} <b>${tailRest(b)}mm</b>`).join('・')
+    +' だけ。<b>あきがある材料からしか大きくできません。</b></p>';
+  if(rs.length){
+    body+='<p style="color:#1c6b3f"><b>でも、あきらめなくて大丈夫。</b>'
+      +'同じ材料にのっている板どうしなら、<b>どこかを縮めれば そのぶん伸ばせます</b>。<br>'
+      + rs.slice(0,2).map(r=>`${me.label}を${v}mmにしたいなら、`
+          +`<b>${r.t.label}を ${tried[r.t.k]} → ${r.v}mm</b> に`
+          +`${r.v<tried[r.t.k]?'縮めて':'のばして'}から、もう一度うごかしてみましょう。`).join('<br>')
+      +'</p>';
+  }else{
+    const sg=suggestWork(tried);
+    const bws=[...new Set(left.map(i=>i.bw))];
+    const mats=STOCK.filter(m=>bws.includes(m.h));
+    body+='<p>取れなくなるのは <b>'+(left.map(i=>i.label).join('・')||'どれかの板')+'</b>。'
+      +'これは <b>'+mats.map(m=>`幅${m.h}mmの材料${m.id}`).join('・')+'</b> からしか取れません'
+      +'（縦びきはしないので、ほかのはばの材料には置けません）。<br>'
+      + boards.filter(b=>bws.includes(b.h))
+          .map(b=>`材料${b.id}：${b.placed.map(q=>`${q.label} ${q.len}`).join(' ＋ ')}`
+                 +` ＋ 切りしろ ＝ のこり ${tailRest(b)}mm`).join('<br>')
+      +'</p><p><b>ほかの寸法を変えてためしてみても、この大きさは材料から取れませんでした。</b>'
+      +`だから ${me.label} はここが限界です。</p>`
+      +(sg?`<p>どうしてもその大きさで作りたいなら、<b>${WORKS[sg.k].name}</b>`
+          +`（${sg.dd.W}×${WORKS[sg.k].D}×${sg.dd.H}mm）のほうが向いています。</p>`:'');
+  }
+  askModal('ここまで！　これ以上は材料が足りません', body,
+    'わかった','作品を選びなおす', ()=>{}, ()=>{ $('picker').style.display=''; buildCards(); });
+}
+/* 寸法パネル。スライダーのDOMは作品ごとに一度だけ作る。
+   毎回 innerHTML を書きかえると、ドラッグ中のスライダーが作り直されて
+   指（ポインタ）から外れ、カクカクした動きになってしまう。 */
+let dimKey=null, dimDrag=null;
+function makeDimDOM(){
+  const W=WORKS[state.work];
+  $('size3').innerHTML =
+    '<div class="orig" hidden></div><div class="bar"></div>'
+   + W.dims.map(t=>`<div class="dimrow" data-k="${t.k}">
+       <div class="lb"><span>${t.label}</span><b></b></div>
+       <input type="range" data-d="${t.k}" step="${t.step}">
+       <div class="rng"><span></span><button class="why" hidden></button></div>
+     </div>`).join('')
+   + '<div class="tip">材料は '+STOCK.map(m=>`幅${m.h}×${m.w}mm`).join('・')
+   + ' の'+STOCK.length+'本だけ。縦びきはしないので、<b>板は同じ幅の材料からしか取れません</b>。'
+   + '<b>同じ幅の材料の中で、どこかを縮めれば どこかを伸ばせます。</b></div>'
+   + '<div class="row back" hidden><button id="dimReset">説明書の寸法に戻す</button></div>';
+  $('size3').querySelectorAll('input[type=range]').forEach(r=>{
+    const grab=()=>{ dimDrag=r; };
+    r.addEventListener('pointerdown',grab);
+    r.addEventListener('keydown',grab);
+    r.addEventListener('input',()=>{
+      const k=r.dataset.d;
+      /* ドラッグ中は、材料に入らない値なら黙って止めるだけ（説明はつまみを離してから） */
+      if(!trySetDim(k,+r.value,true)) r.value=dimsOf()[k];
+    });
+    const drop=()=>{ if(dimDrag===r){ dimDrag=null; refresh(); } };
+    r.addEventListener('change',drop);
+    r.addEventListener('pointerup',drop);
+    r.addEventListener('blur',drop);
+  });
+  if(!window.__dimUp){ window.__dimUp=1;
+    window.addEventListener('pointerup',()=>{ if(dimDrag){ dimDrag=null; refresh(); } }); }
+  $('size3').querySelectorAll('button.why').forEach(bt=>{
+    bt.onclick=()=>limitDialog(bt.dataset.why,+bt.dataset.wv);
+  });
+  $('dimReset').onclick=()=>{ state.dims={}; refresh(); };
+}
+function buildDims(){
+  if(dimKey!==state.work){ makeDimDOM(); dimKey=state.work; }
+  const W=WORKS[state.work], d=dimsOf(), f=defDims(state.work);
+  const o=outer(), {boards}=nest(parts()), box=$('size3');
+  const ob=box.querySelector('.orig');
+  ob.hidden=!isOriginal();
+  if(!ob.hidden) ob.innerHTML='<b>あなたのオリジナル寸法！</b>自分で大きさを考えたのはいいことです。'
+    +'説明書とは数字がちがうので、けがきは<b>この画面</b>の数字を使いましょう。';
+  box.querySelector('.bar').innerHTML=
+     `外はば <b>${o.W}</b>・奥行 <b>${o.D}</b>・高さ <b>${o.H}</b> mm　板厚12<br>`
+    +'右はしのあき：'+ boards.map(b=>`${b.id} <b>${tailRest(b)}</b>`).join(' / ')
+    +' mm　<span style="color:#9a9084">あきがある材料だけ大きくできます</span>';
+  for(const t of W.dims){
+    const row=box.querySelector(`.dimrow[data-k="${t.k}"]`), inp=row.querySelector('input');
+    const v=d[t.k];
+    row.classList.toggle('moved', v!==f[t.k]);
+    row.querySelector('.lb b').textContent=v+'mm';
+    if(inp===dimDrag) continue;        // つかんでいる最中のスライダーには触らない
+    const lm=dimSpan(t,d), stuck=(lm[0]>=lm[1]);
+    inp.min=lm[0]; inp.max=lm[1]; inp.value=v; inp.disabled=stuck;
+    row.querySelector('.rng span').textContent=`${lm[0]} 〜 ${lm[1]}mm`;
+    const bt=row.querySelector('.why'), atMax=(v>=lm[1]), atMin=(v<=lm[0]);
+    bt.hidden=!(stuck||atMax||atMin);
+    if(!bt.hidden){
+      bt.textContent=(stuck?'動かせません':(atMax?'いま最大':'いま最小'))+'・なぜ？';
+      bt.dataset.why=t.k;
+      bt.dataset.wv=(atMin&&!atMax)?lm[0]-t.step:lm[1]+t.step;
+    }
+  }
+  box.querySelector('.row.back').hidden=!isOriginal();
+}
+
+/* 折りたたみ見出し（一度だけ配線する） */
+function wireAcc(){
+  document.querySelectorAll('.acc>h2').forEach(h=>{
+    if(h.dataset.on) return; h.dataset.on='1';
+    h.onclick=()=>h.parentElement.classList.toggle('open');
+  });
+}
+function buildHole(){
+  const box=$('holeBox'), ps=parts();
+  const cands=holeParts();
+  let h='<div style="font-size:11.5px;margin-bottom:3px">ケーブルを通す穴（φ'+HOLE_D+'）</div>'
+   +'<select id="holeSel"><option value="">あけない</option>'
+   +cands.map(c=>`<option value="${c.id}"${state.hole&&state.hole.id===c.id?' selected':''}>`
+       +`${labels()[c.id]||c.name}にあける</option>`).join('')+'</select>';
+  if(state.hole){
+    const p=ps.find(q=>q.id===state.hole.id);
+    h+=`<p class="note">板の左端から <b>${state.hole.x}mm</b>`
+      +`（${p?Math.round(p.w):0}mmのうち）。緑の玉をドラッグ、または材料取り図でドラッグ（5mm刻み）。</p>`;
+  }else{
+    h+='<p class="note">底板・棚板・天板だけ。作品にひとつまで。</p>';
+  }
+  h+='<div style="font-size:11.5px;margin:9px 0 3px">手を入れる穴（側板・'+HAND_W+'×'+HAND_H+'）</div>';
+  if(!handleOK()){
+    h+='<p class="note">この作品はふた（天板）があるので、手を入れる穴は使えません。</p>';
+  }else{
+    h+=`<div class="row"><button id="handBtn" class="${state.handle?'on':''}">`
+      +`${state.handle?'くりぬいてある':'くりぬく'}</button></div>`;
+    h+= state.handle
+      ? `<p class="note">上端から <b>${state.handleY}mm</b> のところが中心。`
+        +'だいだい色の玉をドラッグ、または材料取り図でドラッグ（5mm刻み）。<br>'
+        +'<span style="color:#b8761c">糸のこでくりぬくので、そのぶん加工の時間が増えます。</span>'
+        +(state.work==='G'?'<br>後付けの取っ手は要らなくなるので、部品から消えます。':'')+'</p>'
+      : '<p class="note">左右の側板に、糸のこで持ち手の穴をくりぬきます。持ち運びやすくなりますが、'
+        +'そのぶん<b>加工の時間が増えます</b>。</p>';
+  }
+  box.innerHTML=h;
+  $('holeSel').onchange=e=>{
+    const id=e.target.value;
+    if(!id) state.hole=null;
+    else{ const p=ps.find(q=>q.id===id)||cands.find(q=>q.id===id), rg=cableRange(p);
+          state.hole={id,x:Math.max(rg.lo,Math.min(rg.hi,Math.round((p.w/2)/5)*5))}; }
+    refresh();
+  };
+  const hb=$('handBtn'); if(hb) hb.onclick=()=>{
+    state.handle=!state.handle;
+    if(state.handle){
+      const p=parts().find(q=>q.id==='L');
+      if(p){ const rg=handleRange(p);
+        state.handleY=Math.max(p.h-rg.hi,Math.min(p.h-rg.lo,state.handleY)); }
+    }
+    refresh();
+  };
+}
+
+function showHint(){
+  const rf=state.selKind==='ref'?state.refs.find(r=>r.id===state.sel):null;
+  $('hint').innerHTML = state.showDim
+    ? '左の一覧で板を選ぶと、その板の寸法図に切り替わります'
+    : state.showEnds
+    ? '<b style="color:#00a344">緑の面＝製材所が切った端。</b>のこぎりより直角が正確です。'
+      +'突き合わせる面や、置く面に接する下端など<b>精度が欲しいところ</b>に回しましょう。'
+      +'何とも接しない上端に使うのはもったいない。'
+    : rf
+      ? `<b>${REF_KINDS[rf.kind].label}をつかんでいます</b>：そのままドラッグ＝置く面の上を前後左右に動く／`
+        +'<b>Shiftキーを押しながらドラッグ＝上下</b>（棚の上に持ち上げられます。置く面より下には行きません）／'
+        +'矢印キーで5mm・Shift＋↑↓で上下／空白をクリックで手を離す'
+      : '空白をドラッグ＝回して見る（下からも見られます）／板をクリック＝選ぶ／'
+        +'入れた物はドラッグでそのまま動かせます（Shiftを押しながらで上下）'
+        +(holeCount()?'／<b>玉をドラッグ＝穴の位置を動かす</b>':'');
+}
+/* ★2.5 のような半分の★も出せるようにする */
+const STAR=n=>{
+  const f=Math.floor(n+1e-6), h=(n-f)>=0.4;
+  return '★'.repeat(f)+(h?'<span class="halfstar">★</span>':'')+'☆'.repeat(Math.max(0,4-f-(h?1:0)));
+};
+function showWork(){
+  const W=WORKS[state.work], L=workload(state.work);
+  $('nowWork').innerHTML=`${W.name} <span class="stars">${STAR(L.stars)}</span>`;
+  $('workTags').innerHTML=
+    `<span class="tag">部品 ${L.pieces}点</span><span class="tag">切る ${L.cuts}回</span>`+
+    `<span class="tag">角の加工 ${L.corners}か所</span><span class="tag">釘 約${L.nails}本</span>`+
+    (holeCount()?`<span class="tag" style="background:#e6f3e9">穴 ${holeCount()}か所`
+       +`${handleOn()?'（糸のこ）':''}</span>`:'')+
+    `<span class="tag" style="background:#efe6d6">${L.why[0]}</span>`;
+}
+
+function refresh(){
+  const ps=parts();
+  const left=drawNest();
+  const {msgs,bad}=checkAll(ps,left);
+  rebuild(ps,state.refs,bad);
+  buildParts(ps); buildRefs(); buildHole(); showWork(); showTable(ps); wireAcc(); markDirty();
+  $('roomBtn').className=state.room?'on':'';
+  $('sceneSel').disabled=!state.room; $('sceneSel').value=state.scene;
+  $('nailBtn').className=state.showNails?'on':'';
+  $('dimBtn').className =state.showDim?'on':'';
+  $('nameBtn').className=state.showNames?'on':'';
+  $('endBtn').className =state.showEnds?'on':'';
+  drawDim(); showHint(); if(!$('draw').hidden) drawSheet();
+  $('msgs').innerHTML=msgs.map(m=>
+    `<div class="msg ${m.lv}"><span class="bd">${m.lv==='ok'?'✓':'!'}</span><span>${m.t}</span></div>`).join('');
+}
+
+/* =========================================================
+   11) 作品選び
+   ========================================================= */
+function miniDraw(cv,key){
+  const W=WORKS[key], dpr=Math.min(devicePixelRatio||1,2);
+  const w=cv.clientWidth||150,h=cv.clientHeight||78;
+  cv.width=w*dpr; cv.height=h*dpr;
+  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
+  const bs=W.make(defDims(key)).map(bbox);
+  const lo=[0,1].map(i=>Math.min(...bs.map(b=>b.min[i])));
+  const hi=[0,1].map(i=>Math.max(...bs.map(b=>b.max[i])));
+  const s=Math.min((w-10)/(hi[0]-lo[0]),(h-8)/(hi[1]-lo[1]));
+  const ox=(w-(hi[0]-lo[0])*s)/2, oy=h-4;
+  /* 奥の物から描く（背板→板） */
+  const order=[...W.make(defDims(key))].sort((a,b)=>a.pos[2]-b.pos[2]);
+  for(const p of order){
+    const b=bbox(p);
+    const x=ox+(b.min[0]-lo[0])*s, y=oy-(b.max[1]-lo[1])*s;
+    const pw=(b.max[0]-b.min[0])*s, ph=(b.max[1]-b.min[1])*s;
+    g.fillStyle = p.role==='back' ? '#c9b08a' : '#d9a86b';
+    g.fillRect(x,y,pw,ph);
+    g.strokeStyle='#7b5c33'; g.lineWidth=.7; g.strokeRect(x+.35,y+.35,pw,ph);
+  }
+}
+function buildCards(){
+  const box=$('cards'); box.innerHTML='';
+  const rec=new Map((state.reco||[]).map(r=>[r.key,r]));
+  const head=$('recoHead');
+  head.innerHTML = rec.size
+    ? `<div class="reco">▼ そうだんの結果（${state.quiz&&state.quiz.code||''}タイプ）から、`
+      +`あなたに向いていそうな${rec.size}つ。<b>ほかを選んでもかまいません。</b></div>`
+    : '';
+  const order=[...Object.keys(WORKS)].sort((a,b)=>
+    (rec.has(b)?1:0)-(rec.has(a)?1:0));
+  for(const key of order){
+    const W=WORKS[key], L=workload(key);
+    const c=document.createElement('button'); c.className='card'+(rec.has(key)?' rec':'');
+    c.innerHTML=`<div class="t"><span class="nm">${W.name}</span>
+        <span class="st">${STAR(L.stars)}</span></div>
+      <canvas></canvas>
+      ${rec.has(key)?`<div class="rwhy">${esc(rec.get(key).why.slice(0,2).join('／'))}</div>`:''}
+      <div class="why">${L.why.slice(0,2).join('／')}${L.why.length>2?'　他':''}</div>
+      <div class="mm">${defDims(key).W}×${W.D}×${defDims(key).H}mm<br>
+        部品${L.pieces}点・切る${L.cuts}回・釘約${L.nails}本<br>
+        <span style="color:#b9b1a5">説明書の難易度は${'★'.repeat(W.manual)}</span></div>`;
+    c.onclick=()=>chooseWork(key);
+    box.appendChild(c);
+    requestAnimationFrame(()=>miniDraw(c.querySelector('canvas'),key));
+  }
+}
+function chooseWork(key){
+  state.work=key; state.corners={}; state.off={}; state.nestX={}; state.flip={};
+  state.hole=null; state.handle=false; state.handleY=40;
+  state.dims={}; state.comment=''; state.warned=false; dimKey=null; dimDrag=null;
+  $('quiz').hidden=true;
+  state.refs.forEach(restRef);
+  state.sel=baseParts()[0].id; state.selKind='part';
+  $('picker').style.display='none'; $('pClose').hidden=false;
+  resize(); refresh(); state.room?fitRoom():fitView();
+  state.screen='main'; stepBar($('mSteps'),'main');
+  setTimeout(()=>{resize();state.room?fitRoom():fitView();drawNest();},60);
+  
+}
+$('roomBtn').onclick=()=>{ state.room=!state.room; resize(); refresh();
+  if(state.room) fitRoom(); else fitView(); };
+$('sceneSel').innerHTML=Object.entries(SCENES).map(([k,v])=>
+  `<option value="${k}">${v.label}</option>`).join('');
+$('sceneSel').onchange=e=>{ state.scene=e.target.value;
+  if(!state.room){ state.room=true; resize(); }
+  refresh(); fitRoom(); };
+$('nailBtn').onclick=()=>{ state.showNails=!state.showNails; refresh(); };
+$('nameBtn').onclick=()=>{ state.showNames=!state.showNames; refresh(); };
+$('endBtn').onclick =()=>{ state.showEnds =!state.showEnds;  refresh(); };
+$('dimBtn').onclick=()=>{
+  state.showDim=!state.showDim;
+  $('dimCv').hidden=!state.showDim;
+  document.body.classList.toggle('dim',state.showDim);
+  resize(); refresh(); drawNest();
+};
+$('pick').onclick=()=>{ $('picker').style.display='flex'; buildCards(); };
+$('pClose').onclick=()=>{ $('picker').style.display='none'; };
+
+/* =========================================================
+   12) 保存と読み込み
+   ========================================================= */
+function saveFile(){
+  const d=JSON.stringify({version:10,work:state.work,corners:state.corners,
+    off:state.off,nestX:state.nestX,flip:state.flip,
+    dims:state.dims,comment:state.comment,who:state.who,scene:state.scene,
+    quiz:state.quiz,reco:state.reco,
+    hole:state.hole,handle:state.handle,handleY:state.handleY,
+    refs:state.refs,nextRef:state.nextRef},null,1);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([d],{type:'application/json'}));
+  a.download=WORKS[state.work].name+'_設計.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+/* ---- 画面の行き来（①作品→②CAD→③けがき→④見た目図→⑤説明書） ---- */
+const STEPS=[['quiz','⓪そうだん'],['pick','①作品'],['main','②CAD'],['draw','③けがき'],
+             ['view','④見た目図'],['sheet','⑤説明書']];
+function stepBar(box,cur){
+  if(!box) return;
+  box.innerHTML=STEPS.map(([k,t])=>
+    `<button data-s="${k}"${k===cur?' class="now"':''}>${t}</button>`).join('');
+  box.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>goScreen(b.dataset.s));
+}
+function goScreen(k,skipCheck){
+  if(k==='quiz'){ if(!state.quiz) state.quiz={ans:[],step:0,done:false};
+    $('draw').hidden=$('view').hidden=$('sheet').hidden=true;
+    $('picker').style.display='none'; $('quiz').hidden=false;
+    state.screen='quiz'; drawQuiz();
+    for(const id of ['mSteps','dSteps','vSteps','sSteps','qSteps']) stepBar($(id),'quiz');
+    return;
+  }
+  $('quiz').hidden=true;
+  /* ③④⑤へ進むときは、材料の両はしとオリジナル寸法の理由をかならず通す */
+  if(!skipCheck && (k==='draw'||k==='view'||k==='sheet')){
+    const bad=endsUnused();
+    if(bad.length && !state.warned){ endsDialog(bad,()=>{ state.warned=true; goScreen(k); }); return; }
+    if(isOriginal() && state.comment.trim().length<10){ askComment(()=>goScreen(k,true)); return; }
+  }
+  $('draw').hidden = (k!=='draw');
+  $('view').hidden = (k!=='view');
+  $('sheet').hidden= (k!=='sheet');
+  if(k==='pick'){ $('picker').style.display=''; buildCards(); }
+  else $('picker').style.display='none';
+  state.screen=k;
+  if(k==='main'){ resize(); refresh(); }
+  if(k==='draw'){ state.drawZoom=null; requestAnimationFrame(()=>drawSheet()); }
+  if(k==='view'){ $('vBody').innerHTML=drawViewSheet(); }
+  if(k==='sheet'){ $('sBody').innerHTML=manualSheet(); }
+  for(const id of ['mSteps','dSteps','vSteps','sSteps','qSteps']) stepBar($(id),k);
+}
+function openDraw(){ goScreen('draw'); }
+/* 材料の右はしがあいたままなら、けがきへ行く前に一度立ち止まらせる */
+function endsUnused(){
+  const {boards}=nest(parts()), bad=[];
+  for(const b of boards){
+    if(!b.placed.length) continue;
+    const last=b.placed[b.placed.length-1];
+    if(last.x+last.len < b.w-0.5) bad.push({id:b.id,rest:Math.round(b.w-(last.x+last.len))});
+  }
+  return bad;
+}
+function askModal(ttl,body,yes,no,onYes,onNo){
+  $('mTtl').textContent=ttl; $('mBody').innerHTML=body;
+  $('mYes').textContent=yes; $('mNo').textContent=no;
+  $('mNo').hidden=!no;
+  $('modal').hidden=false;
+  $('mYes').onclick=()=>{ $('modal').hidden=true; if(onYes) onYes(); };
+  $('mNo').onclick =()=>{ $('modal').hidden=true; if(onNo) onNo(); };
+}
+/* オリジナル寸法にしたら、理由を書かないとけがきへ行けない */
+function askComment(next){
+  askModal('なぜ その大きさにしたのかを書こう',
+    '<p>説明書とちがう、あなたのオリジナル寸法になっています。<br>'
+    +'<b>どうしてその大きさにしたのか</b>を書いてから、けがきへ進みましょう。'
+    +'（入れたい物の名前と大きさが書けると、もっといい設計になります）</p>'
+    +`<textarea id="mCmt" placeholder="例：文庫本を12冊ならべたいので、はばを200mmにしました。">`
+    +`${esc(state.comment||'')}</textarea>`
+    +'<div class="err" id="mErr" hidden>あと少しくわしく書きましょう（10文字以上）</div>',
+    'けがきへ進む','やめる', null, null);
+  const ta=$('mCmt'); ta.focus();
+  $('mYes').onclick=()=>{
+    const v=ta.value.trim();
+    if(v.length<10){ $('mErr').hidden=false; return; }
+    state.comment=v; $('modal').hidden=true; next();
+  };
+}
+function endsDialog(bad,onYes){
+  askModal('ちょっと待って！　材料の右はしが余っています',
+    `<p>いま <b>材料${bad.map(b=>b.id).join('・')}</b> の右はしが `
+    +`${bad.map(b=>b.rest+'mm').join('・')} 余ったままです。</p>`
+    +'<p>材料の両はしは<b>製材所がまっすぐ切った面</b>で、のこぎりで切った面よりずっと直角が正確です。'
+    +'そこを使わずに余らせてしまうと、<b>せっかくのきれいな面を捨てる</b>ことになります。</p>'
+    +'<p>材料取り図で部品を右はしまでドラッグすると、パチッと止まります。'
+    +'そのあと「きれいな面」で、どちらの端に持っていくかを決められます。</p>',
+    'このまま進む','材料取り図で直す', onYes, ()=>goScreen('main',true));
+}
+$('save').onclick=saveFile;
+$('dBack').onclick=()=>goScreen('main');
+$('vPrint').onclick=()=>window.print();
+$('sPrint').onclick=()=>window.print();
+$('aboutBtn').onclick=()=>{ $('about').hidden=false; };
+$('aboutBtn2').onclick=()=>{ $('about').hidden=false; };
+$('abClose').onclick=()=>{ $('about').hidden=true; };
+$('whoIn').oninput=e=>{ state.who=e.target.value.slice(0,40);
+  if(!$('sheet').hidden) $('sBody').innerHTML=manualSheet(); };
+$('dSave').onclick=saveFile;
+$('dNail').onclick=()=>{ state.showNails=!state.showNails; refresh(); drawSheet(); };
+$('dZoomOut').onclick=()=>{ state.drawZoom=null; drawSheet(); };
+window.addEventListener('resize',()=>{ if(!$('draw').hidden) drawSheet(); });
+$('openBtn').onclick=()=>$('openFile').click();
+$('openFile').onchange=e=>{
+  const f=e.target.files[0]; if(!f)return; const r=new FileReader();
+  r.onload=()=>{ try{
+      const d=JSON.parse(r.result); if(!WORKS[d.work]) throw new Error('知らない作品です');
+      state.work=d.work; state.corners=d.corners||{}; state.off=d.off||{};
+      state.nestX=d.nestX||{}; state.flip=d.flip||{};
+      state.hole=d.hole||null; state.handle=!!d.handle; state.handleY=d.handleY||40;
+      state.dims=d.dims||{}; state.comment=d.comment||''; state.who=d.who||'';
+      state.scene=SCENES[d.scene]?d.scene:'desk';
+      state.quiz=d.quiz||null; state.reco=d.reco||null;
+      const ss=$('sceneSel'); if(ss) ss.value=state.scene;
+      const wi=$('whoIn'); if(wi) wi.value=state.who;
+      state.refs=d.refs||[]; state.nextRef=d.nextRef||1;
+      state.sel=baseParts()[0].id; state.selKind='part';
+      $('pClose').hidden=false; state.warned=false;
+      goScreen('main',true); fitView();
+    }catch(err){ alert('読み込めませんでした：'+err.message); } };
+  r.readAsText(f); e.target.value='';
+};
+
+/* =========================================================
+   14) 図面（正投影図＝第三角法・等角図）
+   紙の上の座標は mm・yは下向き。A4たて（210×297）に描く。
+   ========================================================= */
+const SQ2=Math.SQRT2, SQ6=Math.sqrt(6), ISOK=Math.sqrt(1.5);
+const VIEWS3={
+  top  :{name:'平面図（上から見た図）', f:(x,y,z)=>[x, z]},
+  front:{name:'正面図（前から見た図）', f:(x,y,z)=>[x,-y]},
+  right:{name:'右側面図（右から見た図）',f:(x,y,z)=>[-z,-y]},
+  iso  :{name:'等角図（できあがりの形）',
+         f:(x,y,z)=>[(x-z)/SQ2*ISOK, -(-x+2*y-z)/SQ6*ISOK]},
+};
+const DEPTH3={ top:(x,y,z)=>y, front:(x,y,z)=>z, right:(x,y,z)=>x, iso:(x,y,z)=>x+y+z };
+
+/* 面の座標(fx,fy) → ワールドの3D点。sd=1が表、-1が裏 */
+function faceTo3D(p,fx,fy,sd){
+  const lx=fx-p.w/2, ly=fy-p.h/2, t=sd*T/2;
+  if(p.posture==='side') return [p.pos[0]+t, p.pos[1]+ly, p.pos[2]-lx];
+  if(p.posture==='flat') return [p.pos[0]+lx, p.pos[1]+t, p.pos[2]-ly];
+  return [p.pos[0]+lx, p.pos[1]+ly, p.pos[2]+t];
+}
+/* 板の輪郭（角の加工こみ）を、表と裏の3D点列にする */
+function partFaces(p){
+  const out=faceOutline(p.w,p.h,p.corners,8);
+  return [out.map(q=>faceTo3D(p,q[0],q[1],1)), out.map(q=>faceTo3D(p,q[0],q[1],-1))];
+}
+/* 穴の輪郭を面の座標で作る（丸穴＝円、手穴＝トラック形） */
+function holeOutline(hl){
+  const pts=[], N=20;
+  if(hl.kind==='cable'){
+    for(let i=0;i<N;i++){ const a=i/N*Math.PI*2;
+      pts.push([hl.cx+hl.r*Math.cos(a), hl.cy+hl.r*Math.sin(a)]); }
+    return pts;
+  }
+  const a1=hl.cx+hl.hw-hl.r, a0=hl.cx-hl.hw+hl.r;
+  for(let i=0;i<=10;i++){ const a=-Math.PI/2+i/10*Math.PI;
+    pts.push([a1+hl.r*Math.cos(a), hl.cy+hl.r*Math.sin(a)]); }
+  for(let i=0;i<=10;i++){ const a=Math.PI/2+i/10*Math.PI;
+    pts.push([a0+hl.r*Math.cos(a), hl.cy+hl.r*Math.sin(a)]); }
+  return pts;
+}
+/* 点をぐるっと囲む多角形（凸包）。板は凸なのでこれで影がとれる */
+function hull2(pts){
+  const P=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+  if(P.length<3) return P;
+  const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+  const lo=[],up=[];
+  for(const q of P){ while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],q)<=0) lo.pop(); lo.push(q); }
+  for(let i=P.length-1;i>=0;i--){ const q=P[i];
+    while(up.length>=2&&cr(up[up.length-2],up[up.length-1],q)<=0) up.pop(); up.push(q); }
+  lo.pop(); up.pop(); return lo.concat(up);
+}
+/* その向きから見たときの、部品ごとの形（おく→手前の順） */
+function viewShapes(vk,ps){
+  const V=VIEWS3[vk], D=DEPTH3[vk];
+  const arr=ps.map(p=>{
+    const [fa,fb]=partFaces(p);
+    const da=fa.reduce((t,q)=>t+D(q[0],q[1],q[2]),0)/fa.length;
+    const db=fb.reduce((t,q)=>t+D(q[0],q[1],q[2]),0)/fb.length;
+    const near=(da>=db)?fa:fb;
+    return { p, depth:Math.max(da,db),
+      hull:hull2(fa.concat(fb).map(q=>V.f(q[0],q[1],q[2]))),
+      face:near.map(q=>V.f(q[0],q[1],q[2])) };
+  });
+  arr.sort((a,b)=>a.depth-b.depth);
+  let mnx=1e9,mny=1e9,mxx=-1e9,mxy=-1e9;
+  for(const s of arr) for(const q of s.hull){
+    mnx=Math.min(mnx,q[0]); mxx=Math.max(mxx,q[0]);
+    mny=Math.min(mny,q[1]); mxy=Math.max(mxy,q[1]); }
+  return {arr, bb:{x:mnx,y:mny,w:mxx-mnx,h:mxy-mny}};
+}
+/* 図を紙に置く。s＝尺度、(ox,oy)＝紙の上でのわく（左上）とその大きさ */
+function placeView(vk,ps,s,ox,oy,bw,bh,opt={}){
+  const {arr,bb}=viewShapes(vk,ps);
+  const px=ox+bw/2-(bb.x+bb.w/2)*s, py=oy+bh/2-(bb.y+bb.h/2)*s;
+  const P=(x,y,z)=>{ const q=VIEWS3[vk].f(x,y,z); return [px+q[0]*s, py+q[1]*s]; };
+  const pl=q=>q.map(a=>(px+a[0]*s).toFixed(2)+','+(py+a[1]*s).toFixed(2)).join(' ');
+  let g='';
+  for(const sh of arr){
+    const fill=opt.plain?'#ffffff':(sh.p.role==='back'?'#efe2c8':'#f6ecd8');
+    g+=`<polygon points="${pl(sh.hull)}" fill="${fill}" stroke="#2a2520" stroke-width="0.5"/>`;
+    g+=`<polygon points="${pl(sh.face)}" fill="none" stroke="#2a2520" stroke-width="0.35"/>`;
+    /* 穴。板の面がこちらを向いている図と等角図だけに、実際の形でかく */
+    const hl=holeOf(sh.p);
+    const faceOn = (vk==='iso')
+      || (vk==='front'&&sh.p.posture==='front')
+      || (vk==='top'  &&sh.p.posture==='flat')
+      || (vk==='right'&&sh.p.posture==='side');
+    if(hl && faceOn){
+      const ho=holeOutline(hl);
+      for(const sd of [1,-1]){
+        const w3=ho.map(q=>faceTo3D(sh.p,q[0],q[1],sd));
+        const pp=w3.map(q=>{ const a=VIEWS3[vk].f(q[0],q[1],q[2]);
+          return (px+a[0]*s).toFixed(2)+','+(py+a[1]*s).toFixed(2); }).join(' ');
+        g+=`<polygon points="${pp}" fill="${sd>0?'#ffffff':'none'}"
+             stroke="#2a2520" stroke-width="0.35"/>`;
+      }
+    }
+  }
+  return {svg:g, P, bb, px, py, s};
+}
+/* 寸法線（紙の上のmmで描く） */
+function dimSvg(a,b,off,txt,dir){
+  const dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy)||1;
+  const nx=(dir==='v')?1:0, ny=(dir==='v')?0:1;
+  const sx=(dir==='v')?off:0, sy=(dir==='v')?0:off;
+  const a2=[a[0]+ (dir==='v'?off:0), a[1]+(dir==='v'?0:off)];
+  const b2=[b[0]+ (dir==='v'?off:0), b[1]+(dir==='v'?0:off)];
+  const mx=(a2[0]+b2[0])/2, my=(a2[1]+b2[1])/2;
+  const t=(dir==='v')
+    ? `<text x="${mx}" y="${my}" font-size="3.4" text-anchor="middle" fill="#1f5fa8"
+        transform="rotate(-90 ${mx} ${my})">${txt}</text>`
+    : `<text x="${mx}" y="${my-1.2}" font-size="3.4" text-anchor="middle" fill="#1f5fa8">${txt}</text>`;
+  return `<g stroke="#1f5fa8" stroke-width="0.25" fill="none">
+    <line x1="${a[0]}" y1="${a[1]}" x2="${a2[0]}" y2="${a2[1]}"/>
+    <line x1="${b[0]}" y1="${b[1]}" x2="${b2[0]}" y2="${b2[1]}"/>
+    <line x1="${a2[0]}" y1="${a2[1]}" x2="${b2[0]}" y2="${b2[1]}"
+      marker-start="url(#ar)" marker-end="url(#ar)"/></g>`+t;
+}
+const SVGDEF=`<defs><marker id="ar" markerWidth="6" markerHeight="6" refX="3" refY="3"
+   orient="auto"><path d="M0,3 L6,1.2 L6,4.8 Z" fill="#1f5fa8"/></marker></defs>`;
+function niceScale(need,have){
+  const want=have/need;
+  for(const r of [1,1/1.5,1/2,1/2.5,1/3,1/4,1/5,1/6,1/8,1/10]) if(want>=r) return r;
+  return 1/10;
+}
+function scaleText(s){
+  const inv=1/s;
+  const near=[1,1.5,2,2.5,3,4,5,6,8,10].reduce((a,b)=>Math.abs(b-inv)<Math.abs(a-inv)?b:a);
+  return (Math.abs(near-inv)<0.02)?`1：${near}`:`1：${inv.toFixed(1)}`;
+}
+
+/* 文字を紙のはばで折り返す */
+function wrapT(t,n){ const out=[]; let cur='';
+  for(const ch of t){ cur+=ch; if(cur.length>=n){ out.push(cur); cur=''; } }
+  if(cur) out.push(cur); return out; }
+/* 角の加工を言葉にする */
+const CNAME=['左下','右下','右上','左上'];
+function cornerSize(p,c){ return Math.min(c.size, Math.min(p.w,p.h)/2); }
+/* その板で指定できる角の大きさの上限（板の短いほうの半分） */
+function CMAX(p){ return Math.max(2, Math.floor(Math.min(p.w,p.h)/2)); }
+function cornerText(p){
+  const t=p.corners.map((c,i)=>c.type==='none'?null
+    :`${CNAME[i]}${c.type==='round'?'R':''}${Math.round(cornerSize(p,c))}`
+     +`${c.type==='chamfer'?'斜め':''}`).filter(Boolean);
+  return t.length?t.join(' '):'―';
+}
+/* ---------- ④ 見た目図（第三角法＋等角図・寸法なし） ---------- */
+function drawViewSheet(){
+  const ps=parts(), W=WORKS[state.work], o=outer();
+  const M=13, PW=210;
+  const bw=(PW-M*2-6)/2, bh=96;
+  const y0=27, y1=y0+bh+5, y2=y1+bh+8;
+  /* 正投影図は3つとも同じ尺度。等角図だけ別の尺度にする */
+  const fit=(vk,f)=>{ const {bb}=viewShapes(vk,ps);
+    return Math.min((bw-10)/Math.max(bb.w,1),(bh-12)/Math.max(bb.h,1))*f; };
+  const s=Math.min(fit('top',1),fit('front',1),fit('right',1));
+  const si=fit('iso',0.86);
+  const pan=(vk,ox,oy,sc)=>
+    `<rect x="${ox}" y="${oy}" width="${bw}" height="${bh}" fill="none"
+      stroke="#d8d0c2" stroke-width="0.3"/>`
+    + placeView(vk,ps,sc,ox,oy+3,bw,bh-3).svg
+    + `<text x="${ox+2}" y="${oy+5}" font-size="3.8" fill="#7b7166">${VIEWS3[vk].name}</text>`;
+  const body = pan('top',M,y0,s) + pan('iso',M+bw+6,y0,si)
+             + pan('front',M,y1,s) + pan('right',M+bw+6,y1,s)
+   + `<g font-size="3.6" fill="#4b423a">
+      <text x="${M}" y="${y2+5}">第三角法：正面図の上に平面図、右に右側面図をかきます。どれも同じ尺度です。</text>
+      <text x="${M}" y="${y2+11}">等角図は、はば・おくゆき・高さを同じ長さでかいた立体の図です（尺度は別）。</text>
+      <text x="${M}" y="${y2+19}" font-size="4">外はば ${o.W}mm ・ おくゆき ${o.D}mm ・ 高さ ${o.H}mm</text></g>`;
+  return sheetSvg(`${W.name}　見た目図`,`正投影図の尺度 ${scaleText(s)}`,body);
+}
+
+/* 組み立ての順番をつくる。下にあるもの・受けになるものから先に付ける */
+function assemblySteps(ps){
+  const st=[], L=ps.find(p=>p.id==='L'), R=ps.find(p=>p.id==='R');
+  const bo=ps.filter(p=>p.posture==='flat').sort((a,b)=>a.pos[1]-b.pos[1])[0];
+  const used=new Set();
+  if(bo&&L&&R){ used.add(bo.id); used.add(L.id); used.add(R.id);
+    st.push(`${bo.label}の左右のこばに、${L.label}と${R.label}を釘で打つ。`
+      +`まず ここで直角を出す（コの字ができる）。`); }
+  const rest=ps.filter(p=>!used.has(p.id)&&p.role!=='back'&&p.role!=='part')
+    .sort((a,b)=>(a.pos[1]-extentOf(a)[1]/2)-(b.pos[1]-extentOf(b)[1]/2));
+  for(const p of rest){
+    if(p.posture==='flat')
+      st.push(`${p.label}を 高さ${Math.round(p.pos[1]+T/2)}mm の線に合わせて入れ、`
+        +`左右の側板から 釘を打つ。`);
+    else if(p.posture==='side')
+      st.push(`${p.label}を 左はしから${Math.round(p.pos[0]-extentOf(p)[0]/2+
+        (ps.find(q=>q.id==='L')?extentOf(L)[0]/2+Math.abs(L.pos[0]):0))}mm の線に立て、`
+        +`直角をたしかめながら 下から釘を打つ。`);
+    else
+      st.push(`${p.label}を前に当てて、両はしから釘を打つ。`);
+  }
+  const backs=ps.filter(p=>p.role==='back');
+  if(backs.length) st.push(`さいごに ${backs.map(p=>p.label).join('・')} を うしろに当て、`
+    +`ゆがみ（たて・よこ・ななめ）をそろえてから打つ。`);
+  st.push('打ち終わったら、平らな台に置いて がたつきがないかを見る。');
+  return st;
+}
+/* ---------- ⑤ 説明書（1枚で全部わかる） ---------- */
+function manualSheet(){
+  const ps=parts(), W=WORKS[state.work], o=outer(), L=workload(state.work);
+  const {boards}=nest(ps);
+  const M=12, PW=210;
+  const bw=(PW-M*2-6)/2, bh=74;
+  const y0=25, y1=y0+bh+4;
+  const fit=(vk,pad)=>{ const {bb}=viewShapes(vk,ps);
+    return Math.min((bw-pad)/Math.max(bb.w,1),(bh-pad)/Math.max(bb.h,1)); };
+  const s=Math.min(fit('top',26),fit('front',26),fit('right',18));
+  const si=fit('iso',18);
+  let body='';
+  const vTop=placeView('top',ps,s,M,y0,bw,bh);
+  const vIso=placeView('iso',ps,si,M+bw+6,y0,bw,bh);
+  const vFr =placeView('front',ps,s,M,y1,bw,bh);
+  const vRt =placeView('right',ps,s,M+bw+6,y1,bw,bh);
+  const frame=(ox,oy,t)=>`<rect x="${ox}" y="${oy}" width="${bw}" height="${bh}" fill="none"
+      stroke="#e0d8c8" stroke-width="0.3"/><text x="${ox+1.5}" y="${oy+4.4}"
+      font-size="3.4" fill="#7b7166">${t}</text>`;
+  body+=frame(M,y0,'平面図')+vTop.svg+frame(M+bw+6,y0,'等角図（完成の形）')+vIso.svg
+       +frame(M,y1,'正面図')+vFr.svg+frame(M+bw+6,y1,'右側面図')+vRt.svg;
+  /* 正面図の寸法 */
+  const bb=vFr.bb, PF=vFr.P;
+  const lx=vFr.px+bb.x*s, rx=vFr.px+(bb.x+bb.w)*s;
+  const ty=vFr.py+bb.y*s, by=vFr.py+(bb.y+bb.h)*s;
+  body+=dimSvg([lx,by],[rx,by],8,`${o.W}`,'h');
+  body+=dimSvg([lx,ty],[lx,by],-8,`${o.H}`,'v');
+  let k=0;
+  for(const q of ps){
+    if(q.posture!=='flat') continue;
+    const top=q.pos[1]+T/2;
+    if(top<=13||top>=o.H-1) continue;
+    const a=PF(0,0,0), b2=PF(0,top,0);
+    body+=dimSvg([rx,a[1]],[rx,b2[1]],7+(k++)*7,`${Math.round(top)}`,'v');
+  }
+  /* 平面図の寸法（おくゆき） */
+  const tb=vTop.bb, tlx=vTop.px+tb.x*s;
+  body+=dimSvg([tlx,vTop.py+tb.y*s],[tlx,vTop.py+(tb.y+tb.h)*s],-8,`${o.D}`,'v');
+  /* 部品表 */
+  let yy=y1+bh+8;
+  const tw=110;
+  body+=`<text x="${M}" y="${yy}" font-size="4.4" font-weight="700" fill="#2a2520">部品表</text>`;
+  yy+=5;
+  body+=`<g font-size="3.3" fill="#7b7166"><text x="${M}" y="${yy}">部品名</text>
+    <text x="${M+40}" y="${yy}">仕上がり寸法</text><text x="${M+74}" y="${yy}">数</text>
+    <text x="${M+82}" y="${yy}">角の加工</text></g>
+    <line x1="${M}" y1="${yy+1.4}" x2="${M+tw}" y2="${yy+1.4}" stroke="#b8ae9e" stroke-width="0.3"/>`;
+  const seen=new Set();
+  for(const r of partTable(ps)){
+    const first=ps.find(q=>Math.round(cutLen(q))===r.len&&q.bw===r.bw&&!seen.has(q.id));
+    if(first) seen.add(first.id);
+    yy+=5.2;
+    body+=`<g font-size="3.4" fill="#2a2520"><text x="${M}" y="${yy}">${esc(r.names.join('・'))}</text>
+      <text x="${M+40}" y="${yy}">12×${r.bw}×${r.len}</text>
+      <text x="${M+74}" y="${yy}">${r.n}</text>
+      <text x="${M+82}" y="${yy}" font-size="3.1">${esc(first?cornerText(first):'―')}</text></g>`;
+  }
+  const holeNote=[];
+  if(state.hole){ const hp=ps.find(q=>q.id===state.hole.id);
+    holeNote.push(`${hp?hp.label:''}にケーブルの穴 φ${HOLE_D}（板の左はしから${state.hole.x}mm）`); }
+  if(handleOn()) holeNote.push(`左右の側板に手を入れる穴 ${HAND_W}×${HAND_H}（上はしから${state.handleY}mm）糸のこ`);
+  /* 材料取り */
+  let my=y1+bh+8;
+  const mx=M+120, mw=PW-M-mx;
+  body+=`<text x="${mx}" y="${my}" font-size="4.4" font-weight="700" fill="#2a2520">材料取り</text>`;
+  my+=4;
+  for(const b of boards){
+    const sc=mw/600, hh=Math.max(5,b.h*sc*0.55);
+    my+=hh+2;
+    body+=`<rect x="${mx}" y="${my-hh}" width="${mw}" height="${hh}" fill="#f2ece0"
+       stroke="#b8ae9e" stroke-width="0.25"/>`;
+    for(const q of b.placed){
+      const qx=mx+q.x*sc, qw=q.len*sc;
+      body+=`<rect x="${qx}" y="${my-hh}" width="${qw}" height="${hh}" fill="#e8d7b4"
+         stroke="#6b5233" stroke-width="0.3"/>`;
+      if(qw>12) body+=`<text x="${qx+qw/2}" y="${my-hh/2+1.1}" font-size="2.7"
+         text-anchor="middle" fill="#3f3225">${q.len}</text>`;
+      if(q.endS) body+=`<rect x="${qx}" y="${my-hh}" width="0.9" height="${hh}" fill="#00a344"/>`;
+      if(q.endE) body+=`<rect x="${qx+qw-0.9}" y="${my-hh}" width="0.9" height="${hh}" fill="#00a344"/>`;
+    }
+    body+=`<text x="${mx}" y="${my+2.7}" font-size="2.8" fill="#7b7166">材料${b.id}　12×${b.h}×600</text>`;
+    my+=4.2;
+  }
+  body+=`<text x="${mx}" y="${my+1.5}" font-size="2.8" fill="#00913c">緑＝製材所が切った端（そのまま使える）</text>`;
+  my+=2;
+  /* 下の段：左＝組み立ての順番、右＝作業のめやす */
+  let ny=Math.max(yy,my)+7;
+  body+=`<line x1="${M}" y1="${ny-4}" x2="${PW-M}" y2="${ny-4}" stroke="#d8d0c2" stroke-width="0.3"/>`;
+  body+=`<text x="${M}" y="${ny+1}" font-size="4.4" font-weight="700" fill="#2a2520">組み立ての順番</text>`;
+  let ay=ny+6;
+  assemblySteps(ps).forEach((t,i)=>{
+    const lines=wrapT(`${i+1}　${t}`,32);
+    for(const ln of lines){ body+=`<g font-size="3.05" fill="#2a2520">
+      <text x="${M}" y="${ay}">${esc(ln)}</text></g>`; ay+=3.9; }
+    ay+=0.6;
+  });
+  body+=`<text x="${mx}" y="${ny+1}" font-size="4.4" font-weight="700" fill="#2a2520">作業のめやす</text>`;
+  let by2=ny+6;
+  const notes=[
+    `切る回数 ${L.cuts}回 ／ 釘 約${L.nails}本 ／ 角の加工 ${L.corners}か所`
+      +(holeCount()?` ／ 穴 ${holeCount()}か所`:''),
+    `釘：打つ長さが120mm以上なら3本（はしから${EDGE_MARGIN}・まん中・はしから${EDGE_MARGIN}）、`
+      +`44mm以上なら2本、それより短いところは1本。列は相手の板のまん中＝はしから${T/2}mm。`,
+    `むずかしさ ★${L.stars}：${L.why.join('／')}`,
+  ].concat(holeNote.map(t=>'穴：'+t));
+  if(state.quiz&&state.quiz.code)
+    notes.push(`そうだんのタイプ ${state.quiz.code}／置き場所 ${SCENES[state.scene].label}`);
+  if(isOriginal()) notes.push(`※あなたのオリジナル寸法です。配られた説明書の数字とはちがいます。`);
+  if(state.comment) notes.push(`この寸法にした理由：${state.comment}`);
+  for(const t of notes){ for(const ln of wrapT(t,31)){
+    body+=`<text x="${mx}" y="${by2}" font-size="3.05" fill="#4b423a">${esc(ln)}</text>`; by2+=3.9; }
+    by2+=0.6; }
+  body+=`<g font-size="3.4" fill="#2a2520">
+    <text x="${PW-M-52}" y="14">名前</text>
+    <line x1="${PW-M-44}" y1="15" x2="${PW-M}" y2="15" stroke="#7b7166" stroke-width="0.3"/>
+    <text x="${PW-M-42}" y="13.6">${esc(state.who||'')}</text></g>`;
+  return sheetSvg(`${W.name}　製作の手引き`,
+    `尺度 ${scaleText(s)}　／　外はば${o.W}×おくゆき${o.D}×高さ${o.H}mm　／　板の厚さ12mm`, body);
+}
+function esc(t){ return String(t).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+function sheetSvg(title,sub,body){
+  return `<svg class="a4" viewBox="0 0 210 297" xmlns="http://www.w3.org/2000/svg">
+    ${SVGDEF}<rect x="0" y="0" width="210" height="297" fill="#ffffff"/>
+    <text x="12" y="13" font-size="6" font-weight="700" fill="#2a2520">${esc(title)}</text>
+    <text x="12" y="19.5" font-size="3.4" fill="#7b7166">${esc(sub)}</text>
+    <line x1="12" y1="21.5" x2="198" y2="21.5" stroke="#b8ae9e" stroke-width="0.3"/>
+    ${body}
+    <text x="198" y="290" font-size="3" fill="#b9b1a5" text-anchor="end">木工製作ナビ＋</text>
+  </svg>`;
+}
+
+/* =========================================================
+   15) そうだん（アンケート）— 何のために作るのかから始める
+   答えは1〜6の数字。6つならべたものが「タイプ番号」。
+   次に使うときは その番号を入れれば 同じ結果が出る。
+   ========================================================= */
+const QUIZ=[
+ {q:'家の中に、置き場所が決まっていなくて 散らかってしまう物がありますか？',
+  a:['ある','とくにない（作ってみたいだけ）']},
+ {q:'その物（入れたい物）は、どれに近いですか？',
+  a:['教科書・ノート・辞書（大きい本）','コミックス・文庫本・CD（小さい本）',
+     'ゲーム機・コントローラ・筆箱（こまごました物）','台所の小物（ラップ・調味料・ふきん）',
+     '雑誌・新聞・プリント（大きくて平たい物）','まだ決めていない']},
+ {q:'できあがったら、どこに置きますか？',
+  a:['自分のつくえの上','台所のカウンター','リビングのゆか','本だなの中／どこでもよい']},
+ {q:'だれのために作りますか？',
+  a:['自分のため','家族のため','教室や部活など、みんなで使う']},
+ {q:'小学校などで、のこぎりで木を切って 物を作ったことはありますか？',
+  a:['何回もある','1〜2回ある','ほとんどない']},
+ {q:'説明書を見て、プラモデルや家具を 最後まで組み立てたことはありますか？',
+  a:['ある（とくいなほう）','ある（時間はかかった）','ほとんどない']},
+];
+const QSCENE=['desk','kitchen','floor','desk'];        // Q3の答え → 場面
+/* Q2の答え → 「中に入れてみる」のどれで確かめるか */
+const QITEM=['text','comic','sw2','pot','mag',null];
+
+/* 作品の「へや（コンパートメント）」を、板の位置から計算する */
+function compartments(ps){
+  const B=new Map(ps.map(p=>[p.id,bbox(p)]));
+  const flats=ps.filter(p=>p.posture==='flat');
+  const verts=ps.filter(p=>p.posture==='side');
+  const out=[];
+  for(const f of flats){
+    const fb=B.get(f.id), y=fb.max[1];
+    const cuts=[fb.min[0],fb.max[0]];
+    for(const v of verts){ const vb=B.get(v.id);
+      if(vb.max[1]>y+10 && vb.min[1]<=y+3 && vb.min[0]>fb.min[0]-1 && vb.max[0]<fb.max[0]+1){
+        cuts.push(vb.min[0]); cuts.push(vb.max[0]); } }
+    cuts.sort((a,b)=>a-b);
+    for(let i=0;i<cuts.length-1;i++){
+      const w=cuts[i+1]-cuts[i];
+      if(w<25) continue;
+      /* 天井は「このへやの真上」にある板だけを見る。
+         へやの半分にしか棚が乗っていない作品（作品例I）を まちがえないため */
+      let ceil=null;
+      for(const g of flats){ if(g===f) continue; const gb=B.get(g.id);
+        if(gb.min[1]>=y+5 && gb.min[0]<cuts[i+1]-5 && cuts[i]<gb.max[0]-5)
+          if(ceil===null||gb.min[1]<ceil) ceil=gb.min[1]; }
+      out.push({x0:cuts[i], x1:cuts[i+1], z0:fb.min[2], z1:fb.max[2],
+        w, d:fb.max[2]-fb.min[2], h:(ceil===null?null:ceil-y), y});
+    }
+  }
+  return out;
+}
+/* その物が そのへやに入るか。
+   ・天井（上の棚）があるへや … 物の高さが まるごと入らないとダメ
+   ・上があいているへや        … 上にはみ出してよいが、支える板が低すぎると倒れる
+   ・立てる物（本）だけ、おくゆきのはみ出しを ゆるす（本立てはそれが普通） */
+function fitsComp(it,c,sideH){
+  const wOK=a=>c.w>=a+4;
+  const dOK=b=>(it.mode==='stand') || c.d>=b+4;
+  const foot = (wOK(it.w)&&dOK(it.d)) || (it.mode!=='stand' && wOK(it.d)&&dOK(it.w));
+  if(!foot) return false;
+  if(c.h!==null) return c.h>=it.h+4;                 // 天井があるなら すっぽり
+  const support=Math.max(0,sideH-c.y);               // 上があいているなら 支えの高さ
+  if(it.h<=140) return true;                         // 低い物は そのまま置ける
+  if(support<it.h*0.45) return false;                // 支えが低すぎると 前にたおれる
+  if(support>=it.h*0.75) return true;                // しっかり支えられていれば はばは関係ない
+  /* 支えが少し足りないときは、へやのはばが せまいほど もちこたえる。
+     作品例F（はば100mmの仕切り）なら 教科書も雑誌も立つが、
+     作品例Aの上の段（はば260mm・支え138mm）では 教科書が よこにバタンと たおれる。
+     同じ作品例Aでも コミックス（174mm）なら 支えが足りるので立つ */
+  return c.w <= support*1.2 + it.w;
+}
+/* そのへやに いくつ入るか */
+function capacityIn(it,c){
+  const pitch=it.w+2;
+  const n=Math.floor((c.w-4)/pitch);
+  if(n<1) return 0;
+  if(it.mode==='stand') return n;
+  const rows=Math.max(1,Math.floor((c.d-4)/(it.d+2)));
+  return n*rows;
+}
+/* 作品の中の「入る場所」を ならべる（手前から順に） */
+function insideSlots(it){ return slotsFor(parts(),it); }
+function slotsFor(ps,it){
+  const cs=compartments(ps);
+  if(!ps.length) return [];
+  const sideH=Math.max(...ps.map(p=>bbox(p).max[1]));
+  const out=[];
+  for(const c of cs){
+    if(!fitsComp(it,c,sideH)) continue;
+    const pitch=it.w+2, n=Math.floor((c.w-4)/pitch);
+    const rows=(it.mode==='stand')?1:Math.max(1,Math.floor((c.d-4)/(it.d+2)));
+    for(let r=0;r<rows;r++) for(let i=0;i<n;i++){
+      const z=(it.mode==='stand')? c.z0+it.d/2
+              : c.z0+2+(r+0.5)*(it.d+2);
+      out.push([c.x0+2+(i+0.5)*pitch, c.y+it.h/2, z]);
+    }
+  }
+  return out;
+}
+function refItem(kind){ const k=REF_KINDS[kind];
+  return {label:k.label,w:k.w,d:k.d,h:k.h,mode:k.mode||'in'}; }
+function refCapacity(kind){ return insideSlots(refItem(kind)).length; }
+const UNIT={text:'冊',comic:'冊',bunko:'冊',mag:'冊',sw2:'台',pot:'個',soy:'個',pet:'本',plush:'つ'};
+/* おすすめを計算する。理由も返す */
+function recommend(ans){
+  const ik=QITEM[(ans[1]||1)-1];
+  const it=ik?refItem(ik):null;
+  const place=QSCENE[(ans[2]||1)-1], anyPlace=((ans[2]||1)===4);
+  const forWhom=ans[3]||1;
+  const saw=3-(ans[4]||3), man=3-(ans[5]||3);          // 0〜2
+  const maxStar=Math.min(4, 1.5+saw*0.75+man*0.75);
+  const out=[];
+  for(const key of Object.keys(WORKS)){
+    const ps=WORKS[key].make(defDims(key));
+    const L=workload(key);
+    const bs=ps.map(bbox);
+    const W=Math.max(...bs.map(b=>b.max[0]))-Math.min(...bs.map(b=>b.min[0]));
+    const H=Math.max(...bs.map(b=>b.max[1]));
+    const sideH=H;
+    const cs=compartments(ps);
+    const div=ps.filter(p=>p.posture==='side'&&p.id!=='L'&&p.id!=='R').length;
+    const hasTop=ps.some(p=>p.id==='tp');
+    let sc=0; const why=[];
+    if(it){
+      const n=slotsFor(ps,it).length, K=REF_KINDS[ik], u=UNIT[ik]||'つ';
+      if(n===0){ sc-=5; why.push(`${it.label}は 入りません`); }
+      else if(K.many){
+        /* 本のように何冊も持っている物は「何冊入るか」が うれしい情報。
+           ただし「32冊まで」は現実ばなれしているので、10冊で言い方を打ち切る */
+        if(n>=10){ sc+=4.5; why.push(`${it.label}が 10${u}以上 入ります`); }
+        else if(n>=3){ sc+=4; why.push(`${it.label}が ${n}${u}入ります`); }
+        else { sc+=2.5; why.push(`${it.label}は ${n}${u}だけ入ります`); }
+      }else{
+        /* ふつう1〜数個しか持っていない物。「14台入ります」は言わない */
+        const m=Math.min(n,K.few);
+        sc += (n>=K.few) ? 4.5 : 3;
+        why.push(m>=2 ? `${it.label}が ${m}${u}ならべて置けます` : K.ok);
+      }
+      if(n>0 && it.mode==='stand' && it.d>160)
+        why.push('大きい本は 前に少しはみ出します');
+    }
+    if(ans[1]===3||ans[1]===4){                         // こまごました物・台所の小物
+      if(div>=2){ sc+=3; why.push(`仕切りが${div}枚あって 分けられます`); }
+      else if(div===1){ sc+=2; why.push('仕切りで2つに分けられます'); }
+    }
+    if(!anyPlace){
+      if(place==='desk'){ if(H<=400){ sc+=2; why.push('つくえの上だなの下に入る高さ'); }
+        if(W<=300) sc+=1; }
+      if(place==='kitchen'){ if(W<=300) sc+=1;
+        if(!hasTop){ sc+=1; why.push('手を入れる穴を つけられます（持ち運びやすくなります）'); } }
+      if(place==='floor'){ if(W>=280){ sc+=2; why.push('ゆかに置いても さまになる大きさ'); }
+        if(H>=200) sc+=1; }
+    }
+    if(forWhom>=2 && !hasTop) sc+=1;
+    if(L.stars<=maxStar){ sc+=3; why.push(`いまの経験なら 作りきれます（★${L.stars}）`); }
+    else if(L.stars<=maxStar+0.5) sc+=0;
+    else { sc-=3; why.push(`★${L.stars}。先生の助けがたくさん要ります`); }
+    out.push({key, sc, stars:L.stars, why});
+  }
+  out.sort((a,b)=>b.sc-a.sc || a.stars-b.stars);
+  return {list:out, maxStar, place, anyPlace, item:it};
+}
+function quizCode(ans){ return ans.map(v=>v||1).join(''); }
+
+/* ---- そうだん画面のUI ---- */
+function startQuiz(){ state.quiz={ans:[],step:0,done:false}; goScreen('quiz'); }
+function drawQuiz(){
+  const q=state.quiz, box=$('qBody');
+  if(q.done){ drawQuizResult(); return; }
+  const i=q.step, Q=QUIZ[i];
+  let h=`<div class="qprog">そうだん　${i+1} / ${QUIZ.length}</div>`
+   +`<h3 class="qq">${esc(Q.q)}</h3><div class="qa">`
+   + Q.a.map((t,j)=>`<button data-a="${j+1}"${q.ans[i]===j+1?' class="on"':''}>${esc(t)}</button>`).join('')
+   +'</div><div class="qrow">';
+  if(i>0) h+='<button id="qBack">← ひとつ戻る</button>';
+  h+='<span class="grow"></span><button id="qSkip">とばして作品を見る</button></div>';
+  if(i===0) h+=`<div class="qcode"><b>まえに そうだんした人へ</b><br>
+    そのときの<b>タイプ番号</b>を入れると、同じ結果が出ます。
+    <input id="qCode" type="text" inputmode="numeric" placeholder="例 132112" maxlength="6">
+    <button id="qCodeGo">この番号でみる</button></div>`;
+  box.innerHTML=h;
+  box.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{
+    q.ans[i]=+b.dataset.a;
+    if(i+1>=QUIZ.length){ q.done=true; finishQuiz(); } else q.step=i+1;
+    drawQuiz();
+  });
+  if($('qBack')) $('qBack').onclick=()=>{ q.step=i-1; drawQuiz(); };
+  $('qSkip').onclick=()=>{ state.reco=null; goScreen('pick'); };
+  if($('qCodeGo')) $('qCodeGo').onclick=()=>{
+    const v=($('qCode').value||'').replace(/[^0-9]/g,'');
+    if(v.length!==QUIZ.length){ alert(`タイプ番号は ${QUIZ.length}けたの数字です。`); return; }
+    const ans=[...v].map((c,j)=>Math.max(1,Math.min(QUIZ[j].a.length,+c)));
+    state.quiz={ans,step:QUIZ.length-1,done:true}; finishQuiz(); drawQuiz();
+  };
+}
+function finishQuiz(){
+  const r=recommend(state.quiz.ans);
+  state.quiz.code=quizCode(state.quiz.ans);
+  state.reco=r.list.slice(0,3).map(x=>({key:x.key,why:x.why,sc:x.sc}));
+  state.scene=r.place;
+  const ss=$('sceneSel'); if(ss) ss.value=state.scene;
+}
+function drawQuizResult(){
+  const r=recommend(state.quiz.ans), box=$('qBody');
+  const top=r.list.slice(0,3);
+  let h=`<div class="qprog">そうだんの けっか</div>
+   <div class="qcodeout">あなたは <b>${state.quiz.code}</b> タイプでした
+     <span>この番号をひかえておくと、次に開いたとき すぐ同じ結果が出せます</span></div>
+   <p class="qlead">あなたの答えから、<b>向いていそうな作品</b>をえらびました。
+     これは <b>おすすめの候補</b>です。ちがう作品を選んでもかまいません。</p>
+   <div class="qcards">`;
+  for(const x of top){
+    const W=WORKS[x.key], d=defDims(x.key);
+    h+=`<div class="qcard"><div class="t">${W.name}
+      <span class="st">${STAR(workload(x.key).stars)}</span></div>
+      <canvas data-mini="${x.key}"></canvas>
+      <div class="mm">${d.W}×${W.D}×${d.H}mm</div>
+      <ul>${x.why.slice(0,3).map(t=>`<li>${esc(t)}</li>`).join('')}</ul>
+      <button data-go="${x.key}">この作品でつくる</button></div>`;
+  }
+  h+='</div>';
+  /* おすすめ以外の7つも、同じ画面に出す（3つしか見ないで決めてしまわないように） */
+  const rest=r.list.slice(3);
+  h+=`<p class="qlead2">おすすめ以外の${rest.length}つも ここにあります。
+      <b>気になったら こちらを選んでもかまいません。</b></p><div class="qrest">`;
+  for(const x of rest){
+    const W=WORKS[x.key], d=defDims(x.key);
+    h+=`<button class="rcard" data-go="${x.key}"><div class="t">${W.name}
+      <span class="st">${STAR(workload(x.key).stars)}</span></div>
+      <canvas data-mini="${x.key}"></canvas>
+      <div class="mm">${d.W}×${W.D}×${d.H}mm</div>
+      <div class="rw">${esc(x.why[0]||'')}</div></button>`;
+  }
+  h+=`</div><div class="qrow"><button id="qAgain">もう一度 そうだんする</button>
+    <span class="grow"></span></div>
+    <p class="note">${r.anyPlace
+      ? '置き場所は 決めていないということなので、ひとまず「自分のつくえの上」で見えるようにしました。'
+      : `置き場所は「${SCENES[r.place].label}」にしておきました。`}あとから変えられます。</p>`;
+  box.innerHTML=h;
+  box.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ chooseWork(b.dataset.go); });
+  box.querySelectorAll('[data-mini]').forEach(c=>
+    requestAnimationFrame(()=>miniDraw(c,c.dataset.mini)));
+  $('qAgain').onclick=()=>startQuiz();
+}
+
+/* =========================================================
+   13) 起動
+   ========================================================= */
+buildCards();
+state.sel=baseParts()[0].id;
+resize(); refresh();
+goScreen('quiz');
+</script>
+</body>
+</html>
