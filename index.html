@@ -960,6 +960,27 @@ function nailRow(span){
   if(span>=44)  return [EDGE_MARGIN, span-EDGE_MARGIN];
   return [span/2];
 }
+// Model matches the 26 mm nail drawn in 3D; this is not a strength calculation.
+const NAIL_LENGTH=26, NAIL_RADIUS=1.05;
+const mm=v=>String(Number(v.toFixed(3)));
+function overlappingParts(ps){
+  const out=[];
+  for(let i=0;i<ps.length;i++) for(let j=i+1;j<ps.length;j++)
+    if(hitBox(bbox(ps[i]),bbox(ps[j]),0.001)) out.push([ps[i],ps[j]]);
+  return out;
+}
+function nailPathClear(p,start,end){
+  if(!pointOnWood(p,start)||!pointOnWood(p,end)) return false;
+  const h=holeOf(p); if(!h) return true;
+  const a=toFace(p,start), b=toFace(p,end);
+  // All supported board postures project an axial nail onto an axis-aligned segment.
+  const lo=[Math.min(a[0],b[0]),Math.min(a[1],b[1])];
+  const hi=[Math.max(a[0],b[0]),Math.max(a[1],b[1])];
+  const reach=h.kind==='hand'?h.hw-h.r:0;
+  const dx=Math.max(0,lo[0]-(h.cx+reach),(h.cx-reach)-hi[0]);
+  const dy=Math.max(0,lo[1]-h.cy,h.cy-hi[1]);
+  return Math.hypot(dx,dy)>h.r+NAIL_RADIUS;
+}
 function pointOnWood(p,wp){
   const [x,y]=toFace(p,wp), cs=p.corners||p.c;
   if(x<0||y<0||x>p.w||y>p.h) return false;
@@ -990,7 +1011,9 @@ function nailSpots(ps,includeInvalid=false){
     for(const t of nailRow(len[L])){
       const q=[0,0,0];
       q[jt.k]=jt.plane; q[jt.ax[L]]=jt.lo[L]+t; q[jt.ax[O]]=(jt.lo[O]+jt.hi[O])/2;
-      const valid=pointOnWood(ps[di],q)&&pointOnWood(ps[ri],q);
+      const start=q.map((v,k)=>v-(k===jt.k?T*nd:0));
+      const tip=q.map((v,k)=>v+(k===jt.k?(NAIL_LENGTH-T)*nd:0));
+      const valid=nailPathClear(ps[di],start,q)&&nailPathClear(ps[ri],q,tip);
       if(valid||includeInvalid) out.push({pos:q, axis:jt.k, dir:nd, driver:ps[di].id, into:ps[ri].id, bw:ps[di].bw, valid});
     }
   }
@@ -1331,7 +1354,7 @@ if(HAS3D){
   };
   const nailMat=bw=>NAIL[bw]||NAIL[150];
   /* 本物の釘に近い太さ：軸φ2.1mm・先はとがる。頭は平釘らしく平たいφ4.6mm */
-  const nailShaft=new THREE.CylinderGeometry(0.25,1.05,26,10);
+  const nailShaft=new THREE.CylinderGeometry(0.25,NAIL_RADIUS,NAIL_LENGTH,10);
   const nailHead =new THREE.CylinderGeometry(2.3,2.3,0.9,16);
   nailShaft.userData.keep=nailHead.userData.keep=true;   // 使い回すので捨てない
 
@@ -1753,10 +1776,14 @@ function checkAll(ps,leftOver){
     msgs.push({lv:'bad',t:`材料が足りません：${leftOver.map(i=>i.label).join('・')}`});
     leftOver.forEach(i=>bad.add(i.id));
   }
+  for(const [a,b] of overlappingParts(ps)){
+    bad.add(a.id); bad.add(b.id);
+    msgs.push({lv:'bad',t:`${a.label}と${b.label}が重なっています。この寸法では組み立てられません。`});
+  }
   const invalid=nailSpots(ps,true).filter(n=>!n.valid);
   if(invalid.length){
     invalid.forEach(n=>{bad.add(n.driver);bad.add(n.into);});
-    msgs.push({lv:'bad',t:'角の加工または穴が釘の予定位置と重なっています。加工を見直してください（該当する釘は表示していません）。'});
+    msgs.push({lv:'bad',t:'角の加工または穴が釘の位置・進路（26mmの釘を想定）と重なっています。加工を見直してください（該当する釘は表示していません）。'});
   }
   /* 段差（自分で動かした板だけ見る。同じ原因は1回だけ） */
   const AX=['左右','上下','前後'],seen=new Set();
@@ -2023,7 +2050,7 @@ function drawDim(){
   vCols.flat().forEach(n=>used.add(n));
   const singles=mine.filter(n=>!used.has(n));
 
-  const ML=104, MR=176, MT=86, MB=46+hRows.length*26;
+  const ML=104, MR=240, MT=86, MB=46+hRows.length*26;
   const s=Math.min((W-ML-MR)/p.w, (H-MT-MB)/p.h);
   const ox=ML+Math.max(0,(W-ML-MR-p.w*s)/2), oy=MT+Math.max(0,(H-MT-MB-p.h*s)/2);
   const X=fx=>ox+fx*s, Y=fy=>oy+(p.h-fy)*s;
@@ -2094,7 +2121,7 @@ function drawDim(){
     guide(X(0),Y(fy),X(p.w),Y(fy));
     row.sort((a,b)=>a.f[0]-b.f[0]);
     const xs=[0,...row.map(n=>n.f[0]),p.w];
-    for(let k=0;k<xs.length-1;k++) dimH(X(xs[k]),X(xs[k+1]),y,String(Math.round(xs[k+1]-xs[k])),col);
+    for(let k=0;k<xs.length-1;k++) dimH(X(xs[k]),X(xs[k+1]),y,mm(xs[k+1]-xs[k]),col);
     for(const n of row) guide(X(n.f[0]),Y(fy),X(n.f[0]),y);
     const ns=[...new Set(row.map(n=>nameOf(n.into)))];
     const into=ns.length>2?ns.slice(0,2).join('・')+'など':ns.join('・');
@@ -2102,7 +2129,7 @@ function drawDim(){
     g.fillText(`→ ${into}へ ${row.length}本`, X(p.w)+10, y); g.restore();
     /* 端から列までの高さ（下端が近ければ下から、上端が近ければ上から） */
     const fromBottom = fy <= p.h-fy;
-    dimV(fromBottom?Y(0):Y(p.h), Y(fy), ox-24-i*22, String(Math.round(fromBottom?fy:p.h-fy)), col);
+    dimV(fromBottom?Y(0):Y(p.h), Y(fy), ox-24-i*22, mm(fromBottom?fy:p.h-fy), col);
   });
 
   /* 縦並びの列 */
@@ -2113,14 +2140,23 @@ function drawDim(){
     guide(X(fx),Y(0),X(fx),Y(p.h));
     cl.sort((a,b)=>a.f[1]-b.f[1]);
     const ys=[0,...cl.map(n=>n.f[1]),p.h];
-    for(let k=0;k<ys.length-1;k++) dimV(Y(ys[k]),Y(ys[k+1]),x,String(Math.round(ys[k+1]-ys[k])),col);
+    for(let k=0;k<ys.length-1;k++) dimV(Y(ys[k]),Y(ys[k+1]),x,mm(ys[k+1]-ys[k]),col);
     const fromLeft = fx <= p.w-fx;
-    dimH(fromLeft?X(0):X(p.w), X(fx), bottom+26+hRows.length*26, String(Math.round(fromLeft?fx:p.w-fx)), col);
+    dimH(fromLeft?X(0):X(p.w), X(fx), bottom+26+hRows.length*26, mm(fromLeft?fx:p.w-fx), col);
   });
 
+  // Every nail has absolute coordinates, including nails not covered by row/column chains.
+  g.save(); g.textAlign='left'; g.fillStyle='#2a2520'; g.font='11px system-ui';
+  g.fillText('釘位置：図の左端／下端から mm',W-230,96);
+  mine.forEach((n,i)=>{
+    const tag=String(i+1);
+    g.fillText(`${tag}: 左${mm(n.f[0])} 下${mm(n.f[1])} →${nameOf(n.into)}`,W-230,112+i*14);
+    g.fillText(tag,X(n.f[0])+6,Y(n.f[1])-6);
+  });
+  g.restore();
   /* 全体の寸法 */
-  dimH(X(0),X(p.w), bottom+26+(hRows.length+(vCols.length?1:0))*26+6, String(Math.round(p.w)));
-  dimV(Y(0),Y(p.h), ox-24-hRows.length*22-18, String(Math.round(p.h)));
+  dimH(X(0),X(p.w), bottom+26+(hRows.length+(vCols.length?1:0))*26+6, mm(p.w));
+  dimV(Y(0),Y(p.h), ox-24-hRows.length*22-18, mm(p.h));
 
   /* 穴の寸法（板の端から中心まで） */
   if(hl){
@@ -2552,8 +2588,8 @@ function partsFor(dd){
   const ps=WORKS[state.work].make(dd);
   return (handleOn()) ? ps.filter(p=>p.role!=='part') : ps;
 }
-function fitsWith(dd){ return nest(partsFor(dd)).left.length===0; }
-function fitsNow(){ return nest(parts()).left.length===0; }
+function fitsWith(dd){ const ps=partsFor(dd); return nest(ps).left.length===0&&!overlappingParts(ps).length; }
+function fitsNow(){ const ps=parts(); return nest(ps).left.length===0&&!overlappingParts(ps).length; }
 /* いま実際にどこまで動かせるか。形の限界と、材料の限界の小さいほう。
    ほかの寸法を小さくすれば、ここは広がる（例：高さを縮めると外はばが伸びる）。 */
 function dimSpan(t,d){
@@ -2636,11 +2672,12 @@ function clampAll(){
 function trySetDim(k,v,quiet){
   const t=WORKS[state.work].dims.find(a=>a.k===k), lm=dimLim(t,dimsOf());
   v=clamp(v,lm[0],lm[1]);
-  const had=(k in state.dims), old=state.dims[k];
+  const previous={...state.dims};
   if(dimsOf()[k]===v) return true;
-  state.dims[k]=v;
-  if(fitsNow()){ state.warned=false; clampAll(); refresh(); return true; }
-  if(had) state.dims[k]=old; else delete state.dims[k];
+  const oldHole=state.hole?{...state.hole}:null, oldHandleY=state.handleY;
+  state.dims[k]=v; clampAll();
+  if(fitsNow()){ state.warned=false; refresh(); return true; }
+  state.dims=previous; state.hole=oldHole; state.handleY=oldHandleY;
   if(!quiet) limitDialog(k,v);
   refresh(); return false;
 }
@@ -2648,6 +2685,10 @@ function trySetDim(k,v,quiet){
 function limitDialog(k,v){
   const me=WORKS[state.work].dims.find(a=>a.k===k);
   const tried={...dimsOf()}; tried[k]=v;
+  const clashes=overlappingParts(partsFor(tried));
+  if(clashes.length){
+    askModal('板が重なるため変更できません', '<p>背板などの部品が重なります。高さや棚板の位置を見直してください。</p>', '戻る',null); return;
+  }
   const left=nest(partsFor(tried)).left;
   const boards=nest(parts()).boards;
   /* 材料が足りないのか、形として ここまでなのか */
@@ -2983,16 +3024,19 @@ function goScreen(k,skipCheck){
   }
   $('quiz').hidden=true;
   /* ③④⑤へ進むときは、材料の両はしとオリジナル寸法の理由をかならず通す */
-  if(!skipCheck && (k==='draw'||k==='view'||k==='sheet')){
+  if(k==='draw'||k==='view'||k==='sheet'){
+    if(overlappingParts(parts()).length||nest(parts()).left.length){
+      askModal('この寸法では製作できません','<p>板の重なり、または材料不足を直してください。</p>','CADで直す',null,()=>goScreen('main',true)); return;
+    }
     const ps=parts();
     if(nailSpots(ps,true).some(n=>!n.valid)){
-      askModal('釘の位置と加工が重なっています',
+      askModal('釘の進路と加工が重なっています（26mm想定）',
         '<p>角の加工または穴を見直してから、けがき・図面・説明書へ進んでください。</p>',
         'CADで直す',null,()=>goScreen('main',true)); return;
     }
     const bad=endsUnused();
-    if(bad.length && !state.warned){ endsDialog(bad,()=>{ state.warned=true; goScreen(k); }); return; }
-    if(isOriginal() && state.comment.trim().length<10){ askComment(()=>goScreen(k,true)); return; }
+    if(!skipCheck && bad.length && !state.warned){ endsDialog(bad,()=>{ state.warned=true; goScreen(k); }); return; }
+    if(!skipCheck && isOriginal() && state.comment.trim().length<10){ askComment(()=>goScreen(k,true)); return; }
   }
   $('draw').hidden = (k!=='draw');
   $('view').hidden = (k!=='view');
@@ -3106,7 +3150,7 @@ $('openFile').onchange=e=>{
       const ss=$('sceneSel'); if(ss) ss.value=state.scene;
       const wi=$('whoIn'); if(wi) wi.value=state.who;
       state.refs=d.refs||[]; state.nextRef=d.nextRef||1;
-      clampAll(); dimKey=null; dimDrag=null; LBLKEY='';
+      clampAll(); if(!fitsNow()) throw new Error('板の重なり、または材料不足があります'); dimKey=null; dimDrag=null; LBLKEY='';
       state.sel=baseParts()[0].id; state.selKind='part';
       $('pClose').hidden=false; state.warned=false;
       goScreen('main',true); fitView();

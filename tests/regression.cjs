@@ -33,3 +33,44 @@ for(const json of ['{"work":"A","corners":{"L":[]}}','{"work":"A","refs":{}}','{
 }
 assert(run("validateDesign({version:10,work:'A',dims:{},refs:[],quiz:{ans:[],step:0,done:false}}).work==='A'"));
 console.log('PASS: syntax, A–J geometry/sheets, assembly, nails, table, cuts, input validation');
+
+// Manufacturing regressions: source functions and actual canvas text output.
+run(between('function partsFor(', 'function limitDialog('));
+run('var refresh=()=>{};');
+select('B');assert.equal(run("trySetDim('sh',302,true)"),false);
+select('H');assert.equal(run("trySetDim('sh',244,true)"),false);
+let accepted=0;
+for(const k of 'ABCDEFGHIJ'){
+ select(k);const defs=run('WORKS[state.work].dims');
+ for(const t of defs){
+  select(k);const lim=run(`dimLim(WORKS[state.work].dims.find(t=>t.k==='${t.k}'),dimsOf())`);
+  for(let v=lim[0];v<=lim[1];v+=t.step){
+   select(k);
+   if(run(`trySetDim('${t.k}',${v},true)`)){
+    accepted++;assert.equal(run('overlappingParts(parts()).length'),0,`${k} ${t.k}=${v}`);
+   }
+  }
+ }
+}
+select('A');run("state.hole={id:'bo',x:25}");
+assert(run("nailSpots(parts(),true).some(n=>n.driver==='L'&&n.into==='bo'&&!n.valid)"));
+assert(run("checkAll(parts(),[]).msgs.some(m=>m.lv==='bad')"));
+run('state.hole.x=100');assert(run('nailSpots(parts(),true).every(n=>n.valid)'));
+const canvasText=[];
+context.devicePixelRatio=1;
+context.document={getElementById:()=>({clientWidth:1400,clientHeight:1000,getContext:()=>new Proxy({measureText:t=>({width:String(t).length*6}),fillText:t=>canvasText.push(String(t))},{get:(o,k)=>k in o?o[k]:(()=>{})})})};
+run(between('const dimCv=', 'const drawCv='));
+select('F');run("trySetDim('W',458,true);state.showDim=true;state.sel='bo';state.selKind='part';drawDim()");
+assert(canvasText.includes('105.5'));assert(canvasText.includes('111.5'));assert(canvasText.includes('434'));
+assert(!canvasText.includes('112'));
+canvasText.length=0;select('I');run("state.showDim=true;state.sel='b1';drawDim()");
+assert(canvasText.some(t=>t.includes('左143 下27')));
+for(const k of 'ABCDEFGHIJ'){
+ select(k);
+ const ids=run('parts().map(p=>p.id)');
+ for(const id of ids){
+  canvasText.length=0;run(`state.sel='${id}';state.showDim=true;drawDim()`);
+  assert.equal(canvasText.filter(t=>/^\d+: 左/.test(t)).length,run(`nailSpots(parts()).filter(n=>n.driver==='${id}').length`),`${k}/${id}: all nail coordinates`);
+ }
+}
+console.log(`PASS: manufacturing sweep (${accepted} accepted), overlap rejection, nail paths, fractional dimensions, coordinates for every default nail`);
