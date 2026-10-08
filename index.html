@@ -3053,7 +3053,8 @@ $('pClose').onclick=()=>{ $('picker').style.display='none'; };
 function stlFilename(){
   const name=$('stlName').value.trim().replace(/[<>:"/\\|?*\x00-\x1f]/g,'_').replace(/\.stl$/i,'').replace(/[. ]+$/g,'');
   if(!name) throw new Error('保存名を入力してください');
-  return name+'.stl';
+  const base=name.replace(/_(?:2|3|5|10)分の1$/,'');
+  return base+'_'+$('stlScale').value+'分の1.stl';
 }
 function updateStlSize(){
   const bs=parts().map(bbox), d=Number($('stlScale').value);
@@ -3062,10 +3063,13 @@ function updateStlSize(){
 }
 $('stlBtn').onclick=()=>{
   if(!buildSTL){alert('STL出力にはthree.min.jsが必要です');return;}
-  $('stlName').value=WORKS[state.work].name+'_模型';
+  $('stlName').value=WORKS[state.work].name+'_'+$('stlScale').value+'分の1';
   $('stlError').textContent='';updateStlSize();$('stlDialog').showModal();
 };
-$('stlScale').onchange=updateStlSize;
+$('stlScale').onchange=()=>{
+  updateStlSize();
+  if($('stlName').value.trim()) $('stlName').value=stlFilename().replace(/\.stl$/i,'');
+};
 $('stlCancel').onclick=()=>$('stlDialog').close();
 $('stlForm').onsubmit=async e=>{
   e.preventDefault();$('stlError').textContent='';
