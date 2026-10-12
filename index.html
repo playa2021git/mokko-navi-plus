@@ -890,39 +890,20 @@ function nest(ps){
 
   for(const bd of boards){
     bd.placed.sort((a,b)=>a.x-b.x);
-    // 自由端しかない部品より、切り口を接合・接地に使える部品を両端へ。
-    if(bd.placed.length>2){
-      const usable=bd.placed.filter(q=>{
-        const p=ps.find(p=>p.id===q.id);
-        return p&&!q.process&&(supportedEnd(p,-1,ps)||supportedEnd(p,1,ps));
-      });
-      if(usable.length>=2){
-        const first=usable[0],last=usable[usable.length-1];
-        bd.placed=[first,...bd.placed.filter(q=>q!==first&&q!==last),last];
-        let x=0;for(const q of bd.placed){q.x=x;x+=q.len+KERF;}
-      }
-    }
-    if(bd.placed.length>1){
-      const last=bd.placed[bd.placed.length-1];
-      last.x=bd.w-last.len;
-    }
-    /* 生徒が動かした位置。隣の部品と切りしろの分だけ間を空ける */
-    for(let i=0;i<bd.placed.length;i++){
-      const q=bd.placed[i], mx=state.nestX[q.id];
-      if(mx===undefined) continue;
-      const prev=bd.placed[i-1], next=bd.placed[i+1];
-      const lo = prev ? prev.x+prev.len+KERF : 0;
-      const hi = (next ? next.x-KERF : bd.w) - q.len;
-      q.x = Math.max(lo, Math.min(hi, mx));
-    }
-    bd.placed.sort((a,b)=>a.x-b.x);
+    /* 初期位置は左詰め。保存した位置を全て反映してから制約を確認する。
+       接合面による並べ替え・右端への自動配置・自動反転は行わない。 */
     for(const q of bd.placed){
-      q.endS=q.x<=0.5; q.endE=q.x+q.len>=bd.w-0.5;
-      const p=ps.find(p=>p.id===q.id);
-      if(p&&!q.process&&q.endS!==q.endE){
-        const a=endAxis(p),sign=q.endS?a.s:-a.s;
-        q.autoFlip=!supportedEnd(p,sign,ps)&&supportedEnd(p,-sign,ps);
-      }
+      const mx=state.nestX[q.id];
+      if(mx!==undefined)q.x=Math.max(0,Math.min(bd.w-q.len,mx));
+    }
+    let edge=bd.w;
+    for(let i=bd.placed.length-1;i>=0;i--){
+      const q=bd.placed[i];q.x=Math.min(q.x,edge-q.len);edge=q.x-KERF;
+    }
+    let cursor=0;
+    for(const q of bd.placed){
+      q.x=Math.max(cursor,q.x);cursor=q.x+q.len+KERF;
+      q.endS=q.x<=0.5;q.endE=q.x+q.len>=bd.w-0.5;
     }
     /* 余り（すき間）を全部拾う */
     bd.gaps=[]; let cur=0;
@@ -946,7 +927,7 @@ function nestRange(ps,id){
 
 /* 部品ごとに「製材所が切った端」がどちらかを調べる。
    生徒が「ひっくり返す」を選んだら、きれいな面は反対の端に移る。 */
-function stockFlip(q){return state.flip[q.id]===undefined?!!q.autoFlip:!!state.flip[q.id];}
+function stockFlip(q){return !!state.flip[q.id];}
 function supportedEnd(p,sign,ps){
   const {ax}=endAxis(p),b=bbox(p),axes=[0,1,2].filter(k=>k!==ax);
   const face=sign>0?b.max[ax]:b.min[ax];
@@ -2292,6 +2273,7 @@ function drawNest(){
     : (state.showEnds
         ? `／ <span style="color:#00a344">緑＝製材所が切った端</span>・部品を左右にドラッグすると材料の端でパチッと止まります`
         : `／ 部品を左右にドラッグできます（赤い帯は切りしろ ${KERF}mm）`))
+    + (boards.some(b=>b.placed.length&&b.placed.at(-1).x+b.placed.at(-1).len<b.w-.5)?'<br>材料の右端にも、製材所で切られた面があります。部品を移動して活用できないか考えてみよう。接合や接地に適した場所で使えるかを考え、使わない選択もできます。':'')
     + (hn.length?'<br>'+hn.join('　／　')+'　※穴も左右にドラッグできます':'')
     + (WORKS[state.work].original?'<br>'+esc(processNotes(ps)[0]):'');
   return left;
