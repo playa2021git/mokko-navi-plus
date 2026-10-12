@@ -289,7 +289,7 @@ body.dim main{height:calc(100vh - 42px)}
   <span class="steps" id="mSteps"></span>
   <button id="save">保存</button>
   <button id="stlBtn">STL出力</button>
-  <button id="stlAllBtn">A〜L一括STL</button>
+  <button id="stlAllBtn">一括STL出力</button>
   <button id="openBtn">開く</button>
   <button class="about" id="aboutBtn">このソフトについて</button>
   <input type="file" id="openFile" accept=".json" hidden>
@@ -299,6 +299,7 @@ body.dim main{height:calc(100vh - 42px)}
   <form id="stlForm">
     <h2 id="stlTitle">作品をSTLファイルに保存</h2>
     <p id="stlDescription">作品本体の角・穴・部品位置を反映します。単位はmmです。</p>
+    <p id="stlRangeRow" hidden><label>作品の範囲 <select id="stlRange"><option value="ABCDEFGHIJKL">A〜Lすべて（12作品）</option><option value="ABCDEF">A〜F（6作品）</option><option value="GHIJKL">G〜L（6作品）</option></select></label></p>
     <p><label>縮尺 <select id="stlScale"><option value="2">1/2</option><option value="3">1/3</option><option value="5">1/5</option><option value="10">1/10</option></select></label></p>
     <p><label>保存名 <input id="stlName" required maxlength="120"></label></p>
     <p id="stlSize"></p>
@@ -3312,11 +3313,14 @@ $('pClose').onclick=()=>{ $('picker').style.display='none'; };
    12) 保存と読み込み
    ========================================================= */
 let stlBatch=false;
+function stlBatchName(){const keys=$('stlRange').value;return '作品例'+keys[0]+'〜'+keys.at(-1)+'_全'+keys.length+'作品';}
 /* 既存のSTL生成を再利用し、初期作品12個を4列×3行で並べる。 */
-function buildAllSTL(divisor){
+function buildAllSTL(divisor,keys='ABCDEFGHIJKL'){
+  if(!['ABCDEFGHIJKL','ABCDEF','GHIJKL'].includes(keys))throw new Error('作品の範囲を選んでください');
+  const columns=keys.length===12?4:3;
   const saved={...state},oldLabels=LBL,oldKey=LBLKEY,models=[];
   try{
-    for(const key of 'ABCDEFGHIJKL'){
+    for(const key of keys){
       Object.assign(state,{work:key,dims:{},corners:{},off:{},nestX:{},flip:{},hole:null,handle:false});LBLKEY='';
       const data=buildSTL(divisor),v=new DataView(data),count=v.getUint32(80,true),lo=[Infinity,Infinity],hi=[-Infinity,-Infinity];
       for(let n=0;n<count;n++)for(let j=0;j<3;j++)for(let a=0;a<2;a++){
@@ -3327,12 +3331,12 @@ function buildAllSTL(divisor){
   }finally{Object.assign(state,saved);LBL=oldLabels;LBLKEY=oldKey;}
   const cell=[0,1].map(a=>Math.max(...models.map(m=>m.hi[a]-m.lo[a]))+10);
   const count=models.reduce((t,m)=>t+m.count,0),data=new ArrayBuffer(84+count*50),v=new DataView(data);
-  new Uint8Array(data).set(new TextEncoder().encode('Mokko Navi Plus A-L / 1:'+divisor));v.setUint32(80,count,true);
+  new Uint8Array(data).set(new TextEncoder().encode('Mokko Navi Plus '+keys+' / 1:'+divisor));v.setUint32(80,count,true);
   let offset=84;
   models.forEach((m,i)=>{
     new Uint8Array(data,offset,m.data.byteLength-84).set(new Uint8Array(m.data,84));
     for(let n=0;n<m.count;n++)for(let j=0;j<3;j++)for(let a=0;a<2;a++){
-      const pos=offset+n*50+12+j*12+a*4,shift=(a===0?i%4:Math.floor(i/4))*cell[a]-m.lo[a];
+      const pos=offset+n*50+12+j*12+a*4,shift=(a===0?i%columns:Math.floor(i/columns))*cell[a]-m.lo[a];
       v.setFloat32(pos,v.getFloat32(pos,true)+shift,true);
     }
     offset+=m.data.byteLength-84;
@@ -3346,21 +3350,23 @@ function stlFilename(){
   return base+'_'+$('stlScale').value+'分の1.stl';
 }
 function updateStlSize(){
-  if(stlBatch){$('stlSize').textContent='A〜Lの初期作品を4列×3行に配置。作品間に10mm以上の間隔を確保します。';return;}
+  if(stlBatch){const count=$('stlRange').value.length;$('stlSize').textContent=stlBatchName()+'の初期作品を'+(count===12?'4列×3行':'3列×2行')+'に配置。作品間に10mm以上の間隔を確保します。';return;}
   const bs=parts().map(bbox), d=Number($('stlScale').value);
   const size=[0,2,1].map(i=>(Math.max(...bs.map(b=>b.max[i]))-Math.min(...bs.map(b=>b.min[i])))/d);
   $('stlSize').textContent='出力サイズ（幅×奥行×高さ）：'+size.map(v=>v.toFixed(1)).join(' × ')+' mm';
 }
 function openStlDialog(batch){
   stlBatch=batch;
-  $('stlTitle').textContent=batch?'A〜Lを1つのSTLファイルに保存':'作品をSTLファイルに保存';
-  $('stlDescription').textContent=batch?'全12作品の初期寸法・加工をまとめて出力します。現在編集中の変更は含みません。単位はmmです。':'作品本体の角・穴・部品位置を反映します。単位はmmです。';
+  $('stlRangeRow').hidden=!batch;
+  $('stlTitle').textContent=batch?'作品をまとめて1つのSTLファイルに保存':'作品をSTLファイルに保存';
+  $('stlDescription').textContent=batch?'選択した範囲の作品の初期寸法・加工をまとめて出力します。現在編集中の変更は含みません。単位はmmです。':'作品本体の角・穴・部品位置を反映します。単位はmmです。';
   if(!buildSTL){alert('STL出力にはthree.min.jsが必要です');return;}
-  $('stlName').value=(batch?'作品例A〜L_全12作品':WORKS[state.work].name)+'_'+$('stlScale').value+'分の1';
+  $('stlName').value=(batch?stlBatchName():WORKS[state.work].name)+'_'+$('stlScale').value+'分の1';
   $('stlError').textContent='';updateStlSize();$('stlDialog').showModal();
 }
 $('stlBtn').onclick=()=>openStlDialog(false);
 $('stlAllBtn').onclick=()=>openStlDialog(true);
+$('stlRange').onchange=()=>{updateStlSize();$('stlName').value=stlBatchName()+'_'+$('stlScale').value+'分の1';};
 $('stlScale').onchange=()=>{
   updateStlSize();
   if($('stlName').value.trim()) $('stlName').value=stlFilename().replace(/\.stl$/i,'');
@@ -3375,7 +3381,7 @@ $('stlForm').onsubmit=async e=>{
     // Open the native picker while the submit still has user activation.
     const handle=window.showSaveFilePicker?await window.showSaveFilePicker({suggestedName:name,
       types:[{description:'STLファイル',accept:{'model/stl':['.stl']}}]}):null;
-    const blob=new Blob([stlBatch?buildAllSTL(divisor):buildSTL(divisor)],{type:'model/stl'});
+    const blob=new Blob([stlBatch?buildAllSTL(divisor,$('stlRange').value):buildSTL(divisor)],{type:'model/stl'});
     if(handle){const stream=await handle.createWritable();await stream.write(blob);await stream.close();}
     else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
     $('stlDialog').close();
