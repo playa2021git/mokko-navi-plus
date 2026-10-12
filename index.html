@@ -3774,12 +3774,15 @@ function manualSheet(){
   const y0=25, y1=y0+bh+4;
   const fit=(vk,pad)=>{ const {bb}=viewShapes(vk,ps);
     return Math.min((bw-pad)/Math.max(bb.w,1),(bh-pad)/Math.max(bb.h,1)); };
-  const s=Math.min(fit('top',26),fit('front',26),fit('right',18));
+  const assemblyDims=dividerAssemblyDims(ps),frontDims=assemblyDims.filter(d=>d.axis===0);
+  const frontTop=8+frontDims.length*4,frontBottom=12+frontDims.length*6;
+  const frontBB=viewShapes('front',ps).bb;
+  const s=Math.min(fit('top',26),fit('front',26),fit('right',18),(bh-frontTop-frontBottom)/Math.max(frontBB.h,1));
   const si=fit('iso',18);
   let body='';
   const vTop=placeView('top',ps,s,M,y0,bw,bh);
   const vIso=placeView('iso',ps,si,M+bw+6,y0,bw,bh);
-  const vFr =placeView('front',ps,s,M,y1,bw,bh);
+  const vFr =placeView('front',ps,s,M,y1+frontTop,bw,bh-frontTop-frontBottom);
   const vRt =placeView('right',ps,s,M+bw+6,y1,bw,bh);
   const frame=(ox,oy,t)=>`<rect x="${ox}" y="${oy}" width="${bw}" height="${bh}" fill="none"
       stroke="#e0d8c8" stroke-width="0.3"/><text x="${ox+1.5}" y="${oy+4.4}"
@@ -3790,7 +3793,7 @@ function manualSheet(){
   const bb=vFr.bb, PF=vFr.P;
   const lx=vFr.px+bb.x*s, rx=vFr.px+(bb.x+bb.w)*s;
   const ty=vFr.py+bb.y*s, by=vFr.py+(bb.y+bb.h)*s;
-  body+=dimSvg([lx,by],[rx,by],8,`${o.W}`,'h');
+  body+=dimSvg([lx,by],[rx,by],8+frontDims.length*6,`${o.W}`,'h');
   body+=dimSvg([lx,ty],[lx,by],-8,`${o.H}`,'v');
   let k=0;
   for(const q of ps){
@@ -3804,12 +3807,14 @@ function manualSheet(){
   const tb=vTop.bb, tlx=vTop.px+tb.x*s;
   body+=dimSvg([tlx,vTop.py+tb.y*s],[tlx,vTop.py+(tb.y+tb.h)*s],-8,`${o.D}`,'v');
   /* 底板端から仕切板の取り付け面まで。図の外寸からは測らない。 */
-  for(const [i,d] of dividerAssemblyDims(ps).entries()){
+  let frontLane=0,topLane=0;
+  for(const d of assemblyDims){
+    const lane=d.axis===0?frontLane++:topLane++;
     const baseBox=bbox(d.base),pr=d.axis===0?vFr.P:vTop.P;
     const a=d.axis===0?pr(d.origin,baseBox.max[1],0):pr(0,baseBox.max[1],d.origin);
     const b=d.axis===0?pr(d.target,baseBox.max[1],0):pr(0,baseBox.max[1],d.target);
-    body+=dimSvg(a,b,d.axis===0?12:8,mm(d.distance),d.axis===0?'h':'v');
-    const textY=(d.axis===0?y1:y0)+8+i*4;
+    body+=dimSvg(a,b,8+lane*6,mm(d.distance),d.axis===0?'h':'v');
+    const textY=(d.axis===0?y1:y0)+8+lane*4;
     body+=`<text x="${M+2}" y="${textY}" font-size="2.6" fill="#3868a0">${esc(d.part.label)}：${esc(d.base.label)}${d.edge}→${d.face} ${mm(d.distance)}mm</text>`;
   }
   /* 部品表 */
@@ -3825,11 +3830,16 @@ function manualSheet(){
   for(const r of partTable(ps,true)){
     const first=r.first;
     if(first) seen.add(first.id);
+    const nameBase=baseName(r.names[0]);
+    const rowName=r.names.length>1&&r.names.every(n=>baseName(n)===nameBase)
+      ?nameBase+r.names.map(n=>n.slice(nameBase.length)).join('・'):r.names.join('・');
+    const nameLines=wrapT(rowName,11);
     yy+=5.2;
-    body+=`<g font-size="3.4" fill="#2a2520"><text x="${M}" y="${yy}">${esc(r.names.join('・'))}</text>
+    body+=`<g font-size="3.4" fill="#2a2520">${nameLines.map((t,i)=>`<text x="${M}" y="${yy+i*3.8}">${esc(t)}</text>`).join('')}
       <text x="${M+40}" y="${yy}">12×${r.bw}×${r.len}</text>
       <text x="${M+74}" y="${yy}">${r.n}</text>
       <text x="${M+82}" y="${yy}" font-size="3.1">${esc(first?cornerText(first):'―')}</text></g>`;
+    yy+=(nameLines.length-1)*3.8;
   }
   const holeNote=[];
   if(state.hole){ const hp=ps.find(q=>q.id===state.hole.id);
