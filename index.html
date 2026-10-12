@@ -1283,16 +1283,17 @@ function workload(key){
 /* =========================================================
    7) 3Dビュー
    ========================================================= */
+function isVerticalBoard(p){return p.posture==='side'||(p.posture==='front'&&lenAxis(p)==='h');}
 function nailDatum(p,ps=parts()){
   const f=factoryEnds(ps).get(p.id);
   const right=lenAxis(p)==='w'&&f&&f.e&&!f.s;
-  return {x:right?p.w:0,y:0,xLabel:right?'右基準端':'左基準端',yLabel:'地'};
+  return {x:right?p.w:0,y:0,xLabel:right?'右基準端':'左基準端',yLabel:isVerticalBoard(p)?'地':'下端',nearest:p.posture==='front'&&!isVerticalBoard(p)};
 }
 function nailCoordinates(p,ps=parts()){
   const datum=nailDatum(p,ps);
   return nailSpots(ps).filter(n=>n.driver===p.id).map((n,i)=>{
-    const f=toFace(p,n.pos);
-    return {number:i+1,nail:n,f,x:Math.abs(f[0]-datum.x),y:f[1],datum};
+    const f=toFace(p,n.pos),d=datum.nearest?{...datum,x:f[0]<=p.w/2?0:p.w,xLabel:f[0]<=p.w/2?'左端':'右端'}:datum;
+    return {number:i+1,nail:n,f,x:Math.abs(f[0]-d.x),y:f[1],datum:d};
   });
 }
 const stage=$('stage');
@@ -1497,21 +1498,24 @@ if(HAS3D){
     g.add(a); g.add(b);
   }
   /* 製材所が切った木口面を光らせる */
-  const ENDMAT=new THREE.MeshBasicMaterial({color:0x00c853});
+  const ENDMAT=new THREE.MeshBasicMaterial({color:0x00e65c,transparent:true,opacity:1,depthTest:false,depthWrite:false,side:THREE.DoubleSide});
   function addEnds(g,p,f){
     if(!f) return;
     const q=p.corners.map(c=>c.type==='none'?0:Math.min(c.size,Math.min(p.w,p.h)/2));
     const lengthIsH = lenAxis(p)==='h';            // 切った長さが板の縦か
     const put=(pos,size)=>{
-      const m=new THREE.Mesh(new THREE.BoxGeometry(size[0],size[1],size[2]),ENDMAT);
-      m.position.set(pos[0],pos[1],pos[2]); g.add(m);
+      if((lengthIsH?size[0]:size[1])<=0)return;
+      const geo=new THREE.PlaneGeometry(lengthIsH?size[0]:T,lengthIsH?T:size[1]);
+      const m=new THREE.Mesh(geo,ENDMAT);
+      if(lengthIsH)m.rotation.x=Math.PI/2;else m.rotation.y=Math.PI/2;
+      m.position.set(pos[0],pos[1],pos[2]);m.renderOrder=9990;m.userData={kind:'factory-end',part:p.id};g.add(m);
     };
     if(lengthIsH){
-      if(f.s){ const cut=q[0]+q[1]; put([(q[0]-q[1])/2,-p.h/2-0.9,0],[Math.max(4,p.w-cut),1.8,T]); }
-      if(f.e){ const cut=q[3]+q[2]; put([(q[3]-q[2])/2, p.h/2+0.9,0],[Math.max(4,p.w-cut),1.8,T]); }
+      if(f.s){ const cut=q[0]+q[1]; put([(q[0]-q[1])/2,-p.h/2,0],[Math.max(0,p.w-cut),.02,T]); }
+      if(f.e){ const cut=q[3]+q[2]; put([(q[3]-q[2])/2, p.h/2,0],[Math.max(0,p.w-cut),.02,T]); }
     }else{
-      if(f.s){ const cut=q[0]+q[3]; put([-p.w/2-0.9,(q[0]-q[3])/2,0],[1.8,Math.max(4,p.h-cut),T]); }
-      if(f.e){ const cut=q[1]+q[2]; put([ p.w/2+0.9,(q[1]-q[2])/2,0],[1.8,Math.max(4,p.h-cut),T]); }
+      if(f.s){ const cut=q[0]+q[3]; put([-p.w/2,(q[0]-q[3])/2,0],[.02,Math.max(0,p.h-cut),T]); }
+      if(f.e){ const cut=q[1]+q[2]; put([ p.w/2,(q[1]-q[2])/2,0],[.02,Math.max(0,p.h-cut),T]); }
     }
   }
   const nailGroup=new THREE.Group(); scene.add(nailGroup);
@@ -1566,11 +1570,12 @@ if(HAS3D){
   const TONE={wood:0xd9a86b, sel:0xc2694a, warn:0xcf9aa4};
   const MATS={}, CLEARMATS=[];
   function woodMat(dir,kind,clear){
-    const k=dir+'-'+kind+(clear?'-c':'');
+    const ends=clear==='ends';
+    const k=dir+'-'+kind+(ends?'-ends':clear?'-c':'');
     if(!MATS[k]){
       MATS[k]=new THREE.MeshLambertMaterial({map:GRAIN[dir],color:TONE[kind],
-        transparent:!!clear, opacity:1, depthWrite:!clear});
-      if(clear) CLEARMATS.push(MATS[k]);
+        transparent:!!clear, opacity:ends?.38:1, depthWrite:!clear});
+      if(clear&&!ends) CLEARMATS.push(MATS[k]);
     }
     return MATS[k];
   }
@@ -1703,7 +1708,7 @@ if(HAS3D){
       /* 釘モードでは「釘を打ち込む側の板」を透かして、
          反対側に必ず相手の板があることを見せる */
       const g=new THREE.Group();
-      g.add(new THREE.Mesh(geo, woodMat(grainDir(p),kind, NAILINFO.drivers.has(p.id))));
+      g.add(new THREE.Mesh(geo, woodMat(grainDir(p),kind,state.showEnds?'ends':NAILINFO.drivers.has(p.id))));
       g.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo,25),EDGE));
       const r=ROT[p.posture]; g.rotation.set(r[0],r[1],r[2]);
       g.position.set(p.pos[0],p.pos[1],p.pos[2]);
@@ -1956,7 +1961,7 @@ if(HAS3D){
     const sig=`${o.yaw.toFixed(4)},${o.pitch.toFixed(4)},${o.dist.toFixed(1)},`
              +`${o.target.x.toFixed(1)},${o.target.y.toFixed(1)},${o.target.z.toFixed(1)}`;
     if(sig!==lastCam){ lastCam=sig; dirty=true; }
-    if(state.showNails){
+    if(state.showNails&&!state.showEnds){
       const now=performance.now();
       if(now-lastPulse>50){                                   // 1秒に20回まで
         lastPulse=now;
@@ -2435,16 +2440,18 @@ function drawDim(){
   xValues.forEach((fx,i)=>{
     const y=bottom+22+i*18;
     guide(X(fx),Y(0),X(fx),y);
-    dimH(X(datum.x),X(fx),y,mm(Math.abs(fx-datum.x)),'#d9007e');
+    const origin=datum.nearest?(fx<=p.w/2?0:p.w):datum.x;
+    dimH(X(origin),X(fx),y,mm(Math.abs(fx-origin)),'#d9007e');
   });
   g.save();g.textAlign='left';g.fillStyle='#2a2520';g.font='11px system-ui';
-  g.fillText('地（寸法の基準）＝図の下端',12,128);
-  g.fillText('横方向：'+datum.xLabel+'から',W-230,96);
+  g.fillText(isVerticalBoard(p)?'地（寸法の基準）＝図の下端':'縦方向の基準＝図の下端',12,128);
+  g.fillText(datum.nearest?'横方向：釘に近い左端／右端から':'横方向：'+datum.xLabel+'から',W-230,96);
   coords.forEach(r=>{
-    g.fillText(`${r.number}: 横${mm(r.x)} 地${mm(r.y)} →${nameOf(r.nail.into)}`,W-230,112+(r.number-1)*14);
+    g.fillText(`${r.number}: ${r.datum.xLabel}${mm(r.x)} ${r.datum.yLabel}${mm(r.y)} →${nameOf(r.nail.into)}`,W-230,112+(r.number-1)*14);
     g.fillText(String(r.number),X(r.f[0])+6,Y(r.f[1])-6);
   });
-  g.fillText('▲ 地（寸法の基準）',X(0),bottom+13);
+  g.fillText(datum.nearest?'▲左端':isVerticalBoard(p)?'▲ 地（寸法の基準）':'▲ 下端基準',X(0),bottom+13);
+  if(datum.nearest){g.textAlign='right';g.fillText('右端▲',X(p.w),bottom+13);}
   g.restore();
   dimH(X(0),X(p.w),bottom+30+xValues.length*18,mm(p.w));
   dimV(Y(0),Y(p.h),ox-42-yValues.length*18,mm(p.h));
@@ -2558,9 +2565,9 @@ function drawSheet(){
       sheetHit.push({board:b.id,x0:x,x1:x+pw,y0:oy,y1:oy+bh});
 
       for(const member of stockMembers(ps,q)){
-        const d=nailDatum(member,ps),pt=stockPoint(member,q,d.x,0);
+        const d=nailDatum(member,ps),marks=d.nearest?[[0,'▲左端'],[member.w,'▲右端']]:[[d.x,isVerticalBoard(member)?'▲地':'▲基準']];
         g.save();g.fillStyle='#243b82';g.font='10px system-ui';g.textAlign='left';
-        g.fillText('▲地',x+pt[0]*sc,oy+pt[1]*sc-5);g.restore();
+        for(const [fx,label] of marks){const pt=stockPoint(member,q,fx,0);g.fillText(label,x+pt[0]*sc,oy+pt[1]*sc-5);}g.restore();
       }
       /* 穴 */
       {
@@ -3752,12 +3759,12 @@ function assemblySteps(ps){
 }
 /* ---------- ⑤ 説明書（1枚で全部わかる） ---------- */
 function nailDatumSheet(ps){
-  let body='<text x="12" y="28" font-size="3.3">地＝各部品図の下端。横は部品ごとの基準端。単位mm。</text>',y=35;
+  let body='<text x="12" y="28" font-size="3.3">縦板は地から。横材は左右の近い端から。単位mm。</text>',y=35;
   for(const p of ps){
     const rows=nailCoordinates(p,ps);if(!rows.length)continue;
-    body+=`<text x="12" y="${y}" font-size="3.4" font-weight="700">${esc(p.label)}　地（寸法の基準）：下端／横：${nailDatum(p,ps).xLabel}</text>`;y+=4.5;
+    body+=`<text x="12" y="${y}" font-size="3.4" font-weight="700">${esc(p.label)}　${isVerticalBoard(p)?'地（寸法の基準）':'下端基準'}／横：${nailDatum(p,ps).nearest?'近い左端・右端':nailDatum(p,ps).xLabel}</text>`;y+=4.5;
     for(const r of rows){
-      body+=`<text x="16" y="${y}" font-size="3.1">${r.number}：横 ${mm(r.x)} ／ 地 ${mm(r.y)} → ${esc(ps.find(q=>q.id===r.nail.into).label)}</text>`;y+=4.2;
+      body+=`<text x="16" y="${y}" font-size="3.1">${r.number}：${r.datum.xLabel} ${mm(r.x)} ／ ${r.datum.yLabel} ${mm(r.y)} → ${esc(ps.find(q=>q.id===r.nail.into).label)}</text>`;y+=4.2;
     }
     y+=2;
   }

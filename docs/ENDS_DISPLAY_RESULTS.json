@@ -1,0 +1,50 @@
+[
+  {
+    "key": "A",
+    "averageRefreshMs": 8.189999997615814
+  },
+  {
+    "key": "B",
+    "averageRefreshMs": 10.75
+  },
+  {
+    "key": "C",
+    "averageRefreshMs": 8.169999998807906
+  },
+  {
+    "key": "D",
+    "averageRefreshMs": 6.440000003576278
+  },
+  {
+    "key": "E",
+    "averageRefreshMs": 5.169999998807907
+  },
+  {
+    "key": "F",
+    "averageRefreshMs": 6.15
+  },
+  {
+    "key": "G",
+    "averageRefreshMs": 10.710000002384186
+  },
+  {
+    "key": "H",
+    "averageRefreshMs": 12.759999996423721
+  },
+  {
+    "key": "I",
+    "averageRefreshMs": 6
+  },
+  {
+    "key": "J",
+    "averageRefreshMs": 6.259999996423721
+  },
+  {
+    "key": "K",
+    "averageRefreshMs": 4.569999998807907
+  },
+  {
+    "key": "L",
+    "averageRefreshMs": 9.720000004768371
+  }
+]
