@@ -3317,7 +3317,7 @@ function stlBatchName(){const keys=$('stlRange').value;return '作品例'+keys[0
 /* 既存のSTL生成を再利用し、初期作品12個を4列×3行で並べる。 */
 function buildAllSTL(divisor,keys='ABCDEFGHIJKL'){
   if(!['ABCDEFGHIJKL','ABCDEF','GHIJKL'].includes(keys))throw new Error('作品の範囲を選んでください');
-  const columns=keys.length===12?4:3;
+  const columns=keys.length===12?4:2;
   const saved={...state},oldLabels=LBL,oldKey=LBLKEY,models=[];
   try{
     for(const key of keys){
@@ -3350,7 +3350,7 @@ function stlFilename(){
   return base+'_'+$('stlScale').value+'分の1.stl';
 }
 function updateStlSize(){
-  if(stlBatch){const count=$('stlRange').value.length;$('stlSize').textContent=stlBatchName()+'の初期作品を'+(count===12?'4列×3行':'3列×2行')+'に配置。作品間に10mm以上の間隔を確保します。';return;}
+  if(stlBatch){const count=$('stlRange').value.length;$('stlSize').textContent=stlBatchName()+'の初期作品を'+(count===12?'4列×3行':'2列×3行')+'に配置。作品間に10mm以上の間隔を確保します。';return;}
   const bs=parts().map(bbox), d=Number($('stlScale').value);
   const size=[0,2,1].map(i=>(Math.max(...bs.map(b=>b.max[i]))-Math.min(...bs.map(b=>b.min[i])))/d);
   $('stlSize').textContent='出力サイズ（幅×奥行×高さ）：'+size.map(v=>v.toFixed(1)).join(' × ')+' mm';
