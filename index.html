@@ -20,13 +20,14 @@ button:hover{background:var(--soft)}
 button.on{background:var(--accent);border-color:var(--accent);color:#fff}
 
 /* ---------- ヘッダー ---------- */
-header{height:42px;display:flex;align-items:center;gap:10px;padding:0 12px;
+header{position:relative;z-index:40;height:42px;display:flex;align-items:center;gap:10px;padding:0 12px;
   background:var(--panel);border-bottom:1px solid var(--line)}
 header h1{font-size:14px;margin:0;letter-spacing:.03em;white-space:nowrap}
 header .ver{color:var(--sub);font-size:10px;margin-left:4px}
 header .sub2{color:var(--sub);font-size:10.5px;white-space:nowrap;
   flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
-@media (max-width:1200px){header .sub2{display:none}}
+@media (max-width:1600px){header .sub2{display:none}}
+@media (max-width:1366px){header{gap:5px;padding:0 6px}header .about{display:none}header .now{font-size:11px}.steps button{padding:3px 5px}}
 header .now{font-weight:600;font-size:13px;white-space:nowrap;flex:none}
 header button,header .steps,header .about{flex:none;white-space:nowrap}
 header .stars{color:var(--accent);letter-spacing:.05em}
@@ -206,7 +207,7 @@ header .about{font-size:11px;color:var(--sub);text-decoration:underline;cursor:p
 .card .rwhy{font-size:10.5px;color:var(--accent);line-height:1.5}
 
 /* ---------- 紙の画面（見た目図・説明書） ---------- */
-.paper{position:fixed;inset:0;z-index:30;background:#efeae0;display:flex;flex-direction:column}
+.paper{position:fixed;inset:42px 0 0;z-index:30;background:#efeae0;display:flex;flex-direction:column}
 .paper .pbar{display:flex;gap:8px;align-items:center;padding:7px 12px;background:var(--panel);
   border-bottom:1px solid var(--line);font-size:13px}
 .paper .pbody{flex:1;overflow:auto;display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px}
@@ -237,7 +238,7 @@ svg.a4{width:min(820px,100%);height:auto;flex-shrink:0;display:block;background:
 #modal b{color:var(--accent)}
 
 /* ---------- 作品選び ---------- */
-#draw{position:fixed;inset:0;background:var(--bg);z-index:22;display:flex;flex-direction:column}
+#draw{position:fixed;inset:42px 0 0;background:var(--bg);z-index:22;display:flex;flex-direction:column}
 .dhead{height:44px;display:flex;align-items:center;gap:10px;padding:0 14px;
   background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto}
 .dhead b{font-size:14px;letter-spacing:.03em;white-space:nowrap}
@@ -335,7 +336,7 @@ body.dim main{height:calc(100vh - 42px)}
       <div class="accb"><div id="endBox"></div></div></section>
     <section class="acc"><h2>穴をあける</h2>
       <div class="accb"><div id="holeBox"></div></div></section>
-    <section class="acc open"><h2>中に入れてみる（大きさくらべ）</h2>
+    <section class="acc open"><h2>中に入れてみる（大きさくらべ）</h2><p class="note">単独最大は中が空の場合の寸法比較です。混在時の残り容量・安定性・耐荷重は保証しません。</p>
       <div class="accb"><div class="refadd" id="refAdd"></div>
       <div id="refFull" class="note"></div>
       <div class="plist" id="refList"></div><div id="refEdit"></div></div></section>
@@ -366,7 +367,7 @@ body.dim main{height:calc(100vh - 42px)}
     <button id="dNail">釘を見る</button>
     <button id="dZoomOut" hidden>材料ぜんぶに戻す</button>
     <button id="dSave">ファイルに保存</button>
-    <button id="dBack">②CADに戻る</button>
+    <button id="dBack">②3Dで確認に戻る</button>
   </div>
   <div class="dbody"><canvas id="drawCv"></canvas></div>
   <div class="dfoot" id="dfoot"></div>
@@ -1282,6 +1283,18 @@ function workload(key){
 /* =========================================================
    7) 3Dビュー
    ========================================================= */
+function nailDatum(p,ps=parts()){
+  const f=factoryEnds(ps).get(p.id);
+  const right=lenAxis(p)==='w'&&f&&f.e&&!f.s;
+  return {x:right?p.w:0,y:0,xLabel:right?'右基準端':'左基準端',yLabel:'地'};
+}
+function nailCoordinates(p,ps=parts()){
+  const datum=nailDatum(p,ps);
+  return nailSpots(ps).filter(n=>n.driver===p.id).map((n,i)=>{
+    const f=toFace(p,n.pos);
+    return {number:i+1,nail:n,f,x:Math.abs(f[0]-datum.x),y:f[1],datum};
+  });
+}
 const stage=$('stage');
 const HAS3D=(typeof THREE!=='undefined');
 let buildSTL=null;
@@ -2334,8 +2347,10 @@ function drawDim(){
 
   /* この板から打ち込む釘を、面の座標に移す */
   const nameOf=id=>{const q=ps.find(x=>x.id===id);return q?q.label:id;};
-  const mine=nailSpots(ps).filter(n=>n.driver===p.id)
-                          .map(n=>({f:toFace(p,n.pos),bw:n.bw,into:n.into}));
+  const coords=nailCoordinates(p,ps),datum=nailDatum(p,ps);
+  const mine=coords.map(r=>({f:r.f,bw:r.nail.bw,into:r.nail.into}));
+  const xValues=[...new Set(coords.map(r=>r.f[0]))].sort((a,b)=>a-b);
+  const yValues=[...new Set(coords.map(r=>r.f[1]))].sort((a,b)=>a-b);
   const rows=new Map();                       // 横並び（同じ高さ）
   const cols=new Map();                       // 縦並び（同じ横位置）
   for(const n of mine){
@@ -2349,7 +2364,7 @@ function drawDim(){
   vCols.flat().forEach(n=>used.add(n));
   const singles=mine.filter(n=>!used.has(n));
 
-  const ML=104, MR=240, MT=86, MB=46+hRows.length*26;
+  const ML=50+yValues.length*18, MR=240, MT=148, MB=50+xValues.length*18;
   const s=Math.min((W-ML-MR)/p.w, (H-MT-MB)/p.h);
   const ox=ML+Math.max(0,(W-ML-MR-p.w*s)/2), oy=MT+Math.max(0,(H-MT-MB-p.h*s)/2);
   const X=fx=>ox+fx*s, Y=fy=>oy+(p.h-fy)*s;
@@ -2412,50 +2427,27 @@ function drawDim(){
     g.strokeStyle='#fff'; g.lineWidth=1.4; g.stroke();
   }
 
-  /* 横並びの列：列の高さ＋列にそった寸法 */
-  hRows.sort((a,b)=>a[0].f[1]-b[0].f[1]);
-  hRows.forEach((row,i)=>{
-    const fy=row[0].f[1], y=bottom+26+i*26;
-    const col=NC[row[0].bw]||NC[150];
-    guide(X(0),Y(fy),X(p.w),Y(fy));
-    row.sort((a,b)=>a.f[0]-b.f[0]);
-    const xs=[0,...row.map(n=>n.f[0]),p.w];
-    for(let k=0;k<xs.length-1;k++) dimH(X(xs[k]),X(xs[k+1]),y,mm(xs[k+1]-xs[k]),col);
-    for(const n of row) guide(X(n.f[0]),Y(fy),X(n.f[0]),y);
-    const ns=[...new Set(row.map(n=>nameOf(n.into)))];
-    const into=ns.length>2?ns.slice(0,2).join('・')+'など':ns.join('・');
-    g.save(); g.textAlign='left'; g.fillStyle=col;
-    g.fillText(`→ ${into}へ ${row.length}本`, X(p.w)+10, y); g.restore();
-    /* 端から列までの高さ（下端が近ければ下から、上端が近ければ上から） */
-    const fromBottom = fy <= p.h-fy;
-    dimV(fromBottom?Y(0):Y(p.h), Y(fy), ox-24-i*22, mm(fromBottom?fy:p.h-fy), col);
+  // Each nail uses the designated datum; never the nearest edge or a chained distance.
+  yValues.forEach((fy,i)=>{
+    guide(X(0),Y(fy),ox-24-i*18,Y(fy));
+    dimV(Y(0),Y(fy),ox-24-i*18,mm(fy),'#d9007e');
   });
-
-  /* 縦並びの列 */
-  vCols.sort((a,b)=>a[0].f[0]-b[0].f[0]);
-  vCols.forEach((cl,i)=>{
-    const fx=cl[0].f[0], x=ox+p.w*s+24+i*22;
-    const col=NC[cl[0].bw]||NC[150];
-    guide(X(fx),Y(0),X(fx),Y(p.h));
-    cl.sort((a,b)=>a.f[1]-b.f[1]);
-    const ys=[0,...cl.map(n=>n.f[1]),p.h];
-    for(let k=0;k<ys.length-1;k++) dimV(Y(ys[k]),Y(ys[k+1]),x,mm(ys[k+1]-ys[k]),col);
-    const fromLeft = fx <= p.w-fx;
-    dimH(fromLeft?X(0):X(p.w), X(fx), bottom+26+hRows.length*26, mm(fromLeft?fx:p.w-fx), col);
+  xValues.forEach((fx,i)=>{
+    const y=bottom+22+i*18;
+    guide(X(fx),Y(0),X(fx),y);
+    dimH(X(datum.x),X(fx),y,mm(Math.abs(fx-datum.x)),'#d9007e');
   });
-
-  // Every nail has absolute coordinates, including nails not covered by row/column chains.
-  g.save(); g.textAlign='left'; g.fillStyle='#2a2520'; g.font='11px system-ui';
-  g.fillText('釘位置：図の左端／下端から mm',W-230,96);
-  mine.forEach((n,i)=>{
-    const tag=String(i+1);
-    g.fillText(`${tag}: 左${mm(n.f[0])} 下${mm(n.f[1])} →${nameOf(n.into)}`,W-230,112+i*14);
-    g.fillText(tag,X(n.f[0])+6,Y(n.f[1])-6);
+  g.save();g.textAlign='left';g.fillStyle='#2a2520';g.font='11px system-ui';
+  g.fillText('地（寸法の基準）＝図の下端',12,128);
+  g.fillText('横方向：'+datum.xLabel+'から',W-230,96);
+  coords.forEach(r=>{
+    g.fillText(`${r.number}: 横${mm(r.x)} 地${mm(r.y)} →${nameOf(r.nail.into)}`,W-230,112+(r.number-1)*14);
+    g.fillText(String(r.number),X(r.f[0])+6,Y(r.f[1])-6);
   });
+  g.fillText('▲ 地（寸法の基準）',X(0),bottom+13);
   g.restore();
-  /* 全体の寸法 */
-  dimH(X(0),X(p.w), bottom+26+(hRows.length+(vCols.length?1:0))*26+6, mm(p.w));
-  dimV(Y(0),Y(p.h), ox-24-hRows.length*22-18, mm(p.h));
+  dimH(X(0),X(p.w),bottom+30+xValues.length*18,mm(p.w));
+  dimV(Y(0),Y(p.h),ox-42-yValues.length*18,mm(p.h));
 
   /* 穴の寸法（板の端から中心まで） */
   if(hl){
@@ -2483,9 +2475,9 @@ function drawDim(){
   /* 見出し */
   g.textAlign='left'; g.textBaseline='alphabetic';
   g.fillStyle='#2a2520'; g.font='600 15px system-ui';
-  g.fillText(`${p.label}`, 12, 58);
+  g.fillText(`${p.label}`, 12, 96);
   g.font='11.5px system-ui'; g.fillStyle='#7b7166';
-  g.fillText(`仕上がり 12 × ${p.bw} × ${Math.round(cutLen(p))} mm`, 12, 76);
+  g.fillText(`仕上がり 12 × ${p.bw} × ${Math.round(cutLen(p))} mm`, 12, 112);
   g.textAlign='right';
   g.fillText(mine.length?'数字は板の端からの距離（mm）':'この板には釘を打ちません（相手の板から打たれます）', W-12, 58);
   /* 色の見方 */
@@ -2565,6 +2557,11 @@ function drawSheet(){
       if(q.endE) g.fillRect(x+pw-Math.max(3,5*sc),oy,Math.max(3,5*sc),bh);
       sheetHit.push({board:b.id,x0:x,x1:x+pw,y0:oy,y1:oy+bh});
 
+      for(const member of stockMembers(ps,q)){
+        const d=nailDatum(member,ps),pt=stockPoint(member,q,d.x,0);
+        g.save();g.fillStyle='#243b82';g.font='10px system-ui';g.textAlign='left';
+        g.fillText('▲地',x+pt[0]*sc,oy+pt[1]*sc-5);g.restore();
+      }
       /* 穴 */
       {
         const pp=ps.find(t=>t.id===q.id), hl0=pp?holeOf(pp):null;
@@ -2805,7 +2802,7 @@ function buildRefs(){
     const cap=refCapacity(k), now=state.refs.filter(r=>r.kind===k&&r.inside).length;
     /* 本は「何冊まで」と出す。Switch2などは「14台まで」と出すと おかしいので出さない */
     const cp = !cap ? '入らない'
-      : v.many ? `${now}/${cap}`
+      : v.many ? `現在${now}${UNIT[k]||'個'}／単独最大${cap}${UNIT[k]||'個'}`
       : now ? `${now}${UNIT[k]||'つ'} 入れた` : 'そのまま入る';
     return `<button data-r="${k}"${cap&&now>=cap?' class="full"':''}>＋${v.label}`
       +`<span class="cap">${cp}</span></button>`;
@@ -3114,7 +3111,9 @@ function buildDims(){
 function wireAcc(){
   document.querySelectorAll('.acc>h2').forEach(h=>{
     if(h.dataset.on) return; h.dataset.on='1';
-    h.onclick=()=>h.parentElement.classList.toggle('open');
+    h.tabIndex=0;h.setAttribute('role','button');
+    const toggle=()=>{h.parentElement.classList.toggle('open');h.setAttribute('aria-expanded',h.parentElement.classList.contains('open'));};
+    h.setAttribute('aria-expanded',h.parentElement.classList.contains('open'));h.onclick=toggle;h.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}};
   });
 }
 function buildHole(){
@@ -3271,7 +3270,22 @@ function buildCards(){
     requestAnimationFrame(()=>miniDraw(c.querySelector('canvas'),key));
   }
 }
-function chooseWork(key){
+let savedDesign=null;
+function designFingerprint(){
+  return JSON.stringify([state.work,state.dims,state.corners,state.off,state.nestX,state.flip,
+    state.hole,state.handle,state.handleY,state.comment,state.who,state.refs,state.scene]);
+}
+function hasUnsavedChanges(){return savedDesign!==null&&savedDesign!==designFingerprint();}
+function guardUnsaved(next){
+  if(!hasUnsavedChanges()){next();return;}
+  askModal('この作品には保存されていない変更があります。',
+    '<p>変更する前にJSON設計データを保存できます。</p><button id="discardDesign">保存せず変更</button>',
+    '保存してから変更','キャンセル',()=>{if(saveFile())next();},()=>{});
+  $('discardDesign').onclick=()=>{$('modal').hidden=true;next();};
+}
+window.addEventListener('beforeunload',e=>{if(hasUnsavedChanges()){e.preventDefault();e.returnValue='';}});
+function chooseWork(key,discard=false){
+  if(!discard&&hasUnsavedChanges()){guardUnsaved(()=>chooseWork(key,true));return;}
   state.work=key; state.corners={}; state.off={}; state.nestX={}; state.flip={};
   state.hole=null; state.handle=false; state.handleY=40;
   state.dims={}; state.comment=''; state.warned=false; dimKey=null; dimDrag=null;
@@ -3282,6 +3296,7 @@ function chooseWork(key){
   state.room=false; resize(); refresh(); fitView();
   state.screen='main'; stepBar($('mSteps'),'main');
   requestAnimationFrame(()=>{resize();fitView();drawNest();});
+  savedDesign=designFingerprint();
   
 }
 $('roomBtn').onclick=()=>{ state.room=!state.room; resize(); refresh();
@@ -3354,9 +3369,10 @@ function saveFile(){
   a.href=URL.createObjectURL(new Blob([d],{type:'application/json'}));
   a.download=WORKS[state.work].name+'_設計.json'; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  savedDesign=designFingerprint();return true;
 }
-/* ---- 画面の行き来（①作品→②CAD→③けがき→④見た目図→⑤説明書） ---- */
-const STEPS=[['quiz','⓪そうだん'],['pick','①作品'],['main','②CAD'],['draw','③けがき'],
+/* ---- 画面の行き来（①作品→②3Dで確認→③けがき→④見た目図→⑤説明書） ---- */
+const STEPS=[['quiz','⓪そうだん'],['pick','①作品'],['main','②3Dで確認'],['draw','③けがき'],
              ['view','④見た目図'],['sheet','⑤説明書']];
 function stepBar(box,cur){
   if(!box) return;
@@ -3376,13 +3392,13 @@ function goScreen(k,skipCheck){
   /* ③④⑤へ進むときは、材料の両はしとオリジナル寸法の理由をかならず通す */
   if(k==='draw'||k==='view'||k==='sheet'){
     if(overlappingParts(parts()).length||nest(parts()).left.length){
-      askModal('この寸法では製作できません','<p>板の重なり、または材料不足を直してください。</p>','CADで直す',null,()=>goScreen('main',true)); return;
+      askModal('この寸法では製作できません','<p>板の重なり、または材料不足を直してください。</p>','3D画面で修正する',null,()=>goScreen('main',true)); return;
     }
     const ps=parts();
     if(nailSpots(ps,true).some(n=>!n.valid)){
       askModal('釘の進路と加工が重なっています（26mm想定）',
         '<p>角の加工または穴を見直してから、けがき・図面・説明書へ進んでください。</p>',
-        'CADで直す',null,()=>goScreen('main',true)); return;
+        '3D画面で修正する',null,()=>goScreen('main',true)); return;
     }
     const bad=endsUnused();
     if(!skipCheck && bad.length && !state.warned){ endsDialog(bad,()=>{ state.warned=true; goScreen(k); }); return; }
@@ -3459,7 +3475,7 @@ $('dSave').onclick=saveFile;
 $('dNail').onclick=()=>{ state.showNails=!state.showNails; refresh(); drawSheet(); };
 $('dZoomOut').onclick=()=>{ state.drawZoom=null; drawSheet(); };
 window.addEventListener('resize',()=>{ if(!$('draw').hidden) drawSheet(); });
-$('openBtn').onclick=()=>$('openFile').click();
+$('openBtn').onclick=()=>guardUnsaved(()=>$('openFile').click());
 function validateDesign(d){
   const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
   const finite=x=>typeof x==='number'&&Number.isFinite(x);
@@ -3493,7 +3509,7 @@ $('openFile').onchange=e=>{
       const d=validateDesign(JSON.parse(r.result));
       state.work=d.work; state.corners=d.corners||{}; state.off=d.off||{};
       state.nestX=d.nestX||{}; state.flip=d.flip||{};
-      state.hole=d.hole||null; state.handle=!!d.handle; state.handleY=d.handleY||40;
+      state.hole=d.hole||null; state.handle=!!d.handle; state.handleY=d.handleY??40;
       state.dims=d.dims||{}; state.comment=d.comment||''; state.who=d.who||'';
       state.scene=SCENES[d.scene]?d.scene:'desk';
       state.quiz=d.quiz||null; state.reco=d.reco||null;
@@ -3504,6 +3520,7 @@ $('openFile').onchange=e=>{
       state.sel=baseParts()[0].id; state.selKind='part';
       $('pClose').hidden=false; state.warned=false;
       goScreen('main',true); fitView();
+      savedDesign=designFingerprint();
     }catch(err){ Object.assign(state,previous); LBLKEY=''; dimKey=null; dimDrag=null;
       $('whoIn').value=state.who; $('sceneSel').value=state.scene;
       try{goScreen(previous.screen,true);}catch(_){}
@@ -3734,6 +3751,18 @@ function assemblySteps(ps){
   return st;
 }
 /* ---------- ⑤ 説明書（1枚で全部わかる） ---------- */
+function nailDatumSheet(ps){
+  let body='<text x="12" y="28" font-size="3.3">地＝各部品図の下端。横は部品ごとの基準端。単位mm。</text>',y=35;
+  for(const p of ps){
+    const rows=nailCoordinates(p,ps);if(!rows.length)continue;
+    body+=`<text x="12" y="${y}" font-size="3.4" font-weight="700">${esc(p.label)}　地（寸法の基準）：下端／横：${nailDatum(p,ps).xLabel}</text>`;y+=4.5;
+    for(const r of rows){
+      body+=`<text x="16" y="${y}" font-size="3.1">${r.number}：横 ${mm(r.x)} ／ 地 ${mm(r.y)} → ${esc(ps.find(q=>q.id===r.nail.into).label)}</text>`;y+=4.2;
+    }
+    y+=2;
+  }
+  return sheetSvg(WORKS[state.work].name+'　釘位置・基準面','番号と寸法は②3Dで確認の寸法図と共通。26mmの釘を想定。',body);
+}
 function manualSheet(){
   const ps=parts(), W=WORKS[state.work], o=outer(), L=workload(state.work);
   const {boards}=nest(ps);
@@ -3853,7 +3882,7 @@ function manualSheet(){
     <line x1="${PW-M-44}" y1="15" x2="${PW-M}" y2="15" stroke="#7b7166" stroke-width="0.3"/>
     <text x="${PW-M-42}" y="13.6">${esc(state.who||'')}</text></g>`;
   return sheetSvg(`${W.name}　製作の手引き`,
-    `尺度 ${scaleText(s)}　／　外はば${o.W}×おくゆき${o.D}×高さ${o.H}mm　／　板の厚さ12mm`, body)+manufacturingSheet(ps);
+    `尺度 ${scaleText(s)}　／　外はば${o.W}×おくゆき${o.D}×高さ${o.H}mm　／　板の厚さ12mm`, body)+manufacturingSheet(ps)+nailDatumSheet(ps);
 }
 function esc(t){ return String(t).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
 function sheetSvg(title,sub,body){

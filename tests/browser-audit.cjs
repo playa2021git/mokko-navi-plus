@@ -2,14 +2,14 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const assert=require('assert'),path=require('path'),fs=require('fs');
 const output=process.env.AUDIT_OUTPUT||path.join(require('os').tmpdir(),'mokko-v3-audit');fs.mkdirSync(output,{recursive:true});
 (async()=>{
- const browser=await chromium.launch({headless:true,channel:'chrome',args:['--allow-file-access-from-files']});
+ const browser=await chromium.launch({headless:true,channel:process.env.BROWSER_CHANNEL||'chrome',args:['--allow-file-access-from-files']});
  const page=await browser.newPage({viewport:{width:1600,height:1050}}),errors=[],report=[];
  page.on('pageerror',e=>errors.push(e.message));await page.goto('file:///'+path.join(__dirname,'../index.html').replace(/\\/g,'/'));
  for(const key of 'ABCDEFGHIJKL'){
-  await page.evaluate(k=>chooseWork(k),key);
+  await page.evaluate(k=>chooseWork(k,true),key);
   const sliders=await page.locator('#size3 input[data-d]').evaluateAll(es=>es.map(e=>({k:e.dataset.d,min:+e.min,max:+e.max,step:+e.step,value:+e.value})));
   for(const t of sliders){
-   await page.evaluate(k=>chooseWork(k),key);
+   await page.evaluate(k=>chooseWork(k,true),key);
    const before=await page.evaluate(()=>JSON.stringify(parts().map(p=>[p.id,p.w,p.h,p.pos])));
    const target=t.value-t.step>=t.min?t.value-t.step:t.value+t.step;
    await page.locator(`#size3 input[data-d="${t.k}"]`).evaluate((e,v)=>{e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));},target);
@@ -35,6 +35,6 @@ const output=process.env.AUDIT_OUTPUT||path.join(require('os').tmpdir(),'mokko-v
   }
   console.log('PASS',key);
  }
- await page.evaluate(()=>{chooseWork('A');state.showEnds=true;state.showNames=false;refresh();});await page.screenshot({path:path.join(output,'A-ends.png'),fullPage:true});
+ await page.evaluate(()=>{chooseWork('A',true);state.showEnds=true;state.showNames=false;refresh();});await page.screenshot({path:path.join(output,'A-ends.png'),fullPage:true});
  assert.deepEqual(errors,[]);fs.writeFileSync(path.join(output,'browser-results.json'),JSON.stringify(report,null,2));await browser.close();console.log('PASS: '+report.length+' changed dimensions across A–L; no page errors');
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -61,16 +61,16 @@ context.devicePixelRatio=1;
 context.document={getElementById:()=>({clientWidth:1400,clientHeight:1000,getContext:()=>new Proxy({measureText:t=>({width:String(t).length*6}),fillText:t=>canvasText.push(String(t))},{get:(o,k)=>k in o?o[k]:(()=>{})})})};
 run(between('const dimCv=', 'const drawCv='));
 select('F');run("trySetDim('W',458,true);state.showDim=true;state.sel='bo';state.selKind='part';drawDim()");
-assert(canvasText.includes('105.5'));assert(canvasText.includes('111.5'));assert(canvasText.includes('434'));
+assert(canvasText.includes('105.5'));assert(canvasText.includes('217'));assert(canvasText.includes('434'));
 assert(!canvasText.includes('112'));
 canvasText.length=0;select('I');run("state.showDim=true;state.sel='b1';drawDim()");
-assert(canvasText.some(t=>t.includes('左143 下27')));
+assert(canvasText.some(t=>t.includes('横143 地27')));
 for(const k of 'ABCDEFGHIJKL'){
  select(k);
  const ids=run('parts().map(p=>p.id)');
  for(const id of ids){
   canvasText.length=0;run(`state.sel='${id}';state.showDim=true;drawDim()`);
-  assert.equal(canvasText.filter(t=>/^\d+: 左/.test(t)).length,run(`nailSpots(parts()).filter(n=>n.driver==='${id}').length`),`${k}/${id}: all nail coordinates`);
+  assert.equal(canvasText.filter(t=>/^\d+: 横/.test(t)).length,run(`nailSpots(parts()).filter(n=>n.driver==='${id}').length`),`${k}/${id}: all nail coordinates`);
  }
 }
 console.log(`PASS: manufacturing sweep (${accepted} accepted), overlap rejection, nail paths, fractional dimensions, coordinates for every default nail`);

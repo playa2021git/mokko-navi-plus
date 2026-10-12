@@ -1,0 +1,242 @@
+[
+  {
+    "channel": "chrome",
+    "width": 1280,
+    "height": 720,
+    "screen": "main",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "chrome",
+    "width": 1280,
+    "height": 720,
+    "screen": "draw",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "chrome",
+    "width": 1280,
+    "height": 720,
+    "screen": "view",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "chrome",
+    "width": 1280,
+    "height": 720,
+    "screen": "sheet",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "chrome",
+    "width": 1366,
+    "height": 768,
+    "screen": "main",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "chrome",
+    "width": 1366,
+    "height": 768,
+    "screen": "draw",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "chrome",
+    "width": 1366,
+    "height": 768,
+    "screen": "view",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "chrome",
+    "width": 1366,
+    "height": 768,
+    "screen": "sheet",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "chrome",
+    "width": 1920,
+    "height": 1080,
+    "screen": "main",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "chrome",
+    "width": 1920,
+    "height": 1080,
+    "screen": "draw",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "chrome",
+    "width": 1920,
+    "height": 1080,
+    "screen": "view",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "chrome",
+    "width": 1920,
+    "height": 1080,
+    "screen": "sheet",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "msedge",
+    "width": 1280,
+    "height": 720,
+    "screen": "main",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "msedge",
+    "width": 1280,
+    "height": 720,
+    "screen": "draw",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "msedge",
+    "width": 1280,
+    "height": 720,
+    "screen": "view",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "msedge",
+    "width": 1280,
+    "height": 720,
+    "screen": "sheet",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "msedge",
+    "width": 1366,
+    "height": 768,
+    "screen": "main",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "msedge",
+    "width": 1366,
+    "height": 768,
+    "screen": "draw",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "msedge",
+    "width": 1366,
+    "height": 768,
+    "screen": "view",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "msedge",
+    "width": 1366,
+    "height": 768,
+    "screen": "sheet",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "msedge",
+    "width": 1920,
+    "height": 1080,
+    "screen": "main",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "msedge",
+    "width": 1920,
+    "height": 1080,
+    "screen": "draw",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "msedge",
+    "width": 1920,
+    "height": 1080,
+    "screen": "view",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  },
+  {
+    "channel": "msedge",
+    "width": 1920,
+    "height": 1080,
+    "screen": "sheet",
+    "save": true,
+    "stl": true,
+    "open": true,
+    "printButtonsHidden": true
+  }
+]
