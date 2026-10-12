@@ -3691,6 +3691,16 @@ function drawViewSheet(){
 }
 
 /* 組み立ての順番をつくる。下にあるもの・受けになるものから先に付ける */
+/* 取り付け寸法は側板ではなく、実際の底板の端を基準にする。 */
+function dividerAssemblyDims(ps){
+  const base=ps.find(p=>p.id==='bo'&&p.posture==='flat');if(!base)return [];
+  const b=bbox(base);
+  return ps.filter(p=>p.name.startsWith('仕切板')&&isVerticalBoard(p)).map(p=>{
+    const axis=p.posture==='side'?0:2,edge=axis===0?'左端':'手前端',face=axis===0?'左面':'手前面';
+    const pb=bbox(p),origin=axis===0?b.min[axis]:b.max[axis],target=axis===0?pb.min[axis]:pb.max[axis];
+    return {part:p,base,axis,edge,face,origin,target,distance:Math.abs(target-origin)};
+  });
+}
 function assemblySteps(ps){
   if(state.work==='K')return [
     '材料取り図の共通線で側板2枚を切り分け、右側板を面内で180度回す。',
@@ -3726,12 +3736,16 @@ function assemblySteps(ps){
     }else if(p.posture==='flat')
       st.push(`${p.label}を 高さ${Math.round(p.pos[1]+T/2)}mm の線に合わせて入れ、`
         +`${connections(p)}釘を打つ。`);
-    else if(p.posture==='side')
-      st.push(`${p.label}を 左はしから${Math.round(p.pos[0]-extentOf(p)[0]/2+
-        (ps.find(q=>q.id==='L')?extentOf(L)[0]/2+Math.abs(L.pos[0]):0))}mm の線に立て、`
-        +`直角をたしかめながら 下から釘を打つ。`);
-    else
-      st.push(`${p.label}を図の位置に合わせ、${connections(p)}釘を打つ。`);
+    else if(p.posture==='side'){
+      const d=dividerAssemblyDims(ps).find(d=>d.part.id===p.id);
+      st.push(d?`${p.label}の${d.face}を${d.base.label}の${d.edge}から${mm(d.distance)}mmに合わせ、下から釘を打つ。`
+        :`${p.label}を図の位置に合わせ、${connections(p)}釘を打つ。`);
+    }
+    else{
+      const d=dividerAssemblyDims(ps).find(d=>d.part.id===p.id);
+      st.push(d?`${p.label}の${d.face}を${d.base.label}の${d.edge}から${mm(d.distance)}mmに合わせ、${connections(p)}釘を打つ。`
+        :`${p.label}を図の位置に合わせ、${connections(p)}釘を打つ。`);
+    }
   }
   const backs=ps.filter(p=>p.role==='back');
   if(backs.length) st.push(`さいごに ${backs.map(p=>p.label).join('・')} を うしろに当て、`
@@ -3789,6 +3803,15 @@ function manualSheet(){
   /* 平面図の寸法（おくゆき） */
   const tb=vTop.bb, tlx=vTop.px+tb.x*s;
   body+=dimSvg([tlx,vTop.py+tb.y*s],[tlx,vTop.py+(tb.y+tb.h)*s],-8,`${o.D}`,'v');
+  /* 底板端から仕切板の取り付け面まで。図の外寸からは測らない。 */
+  for(const [i,d] of dividerAssemblyDims(ps).entries()){
+    const baseBox=bbox(d.base),pr=d.axis===0?vFr.P:vTop.P;
+    const a=d.axis===0?pr(d.origin,baseBox.max[1],0):pr(0,baseBox.max[1],d.origin);
+    const b=d.axis===0?pr(d.target,baseBox.max[1],0):pr(0,baseBox.max[1],d.target);
+    body+=dimSvg(a,b,d.axis===0?12:8,mm(d.distance),d.axis===0?'h':'v');
+    const textY=(d.axis===0?y1:y0)+8+i*4;
+    body+=`<text x="${M+2}" y="${textY}" font-size="2.6" fill="#3868a0">${esc(d.part.label)}：${esc(d.base.label)}${d.edge}→${d.face} ${mm(d.distance)}mm</text>`;
+  }
   /* 部品表 */
   let yy=y1+bh+8;
   const tw=110;
