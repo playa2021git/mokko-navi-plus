@@ -1,0 +1,200 @@
+[
+  {
+    "key": "A",
+    "dimension": "W",
+    "value": 282,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "A",
+    "dimension": "H",
+    "value": 310,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "A",
+    "dimension": "sh",
+    "value": 172,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "B",
+    "dimension": "W",
+    "value": 192,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "B",
+    "dimension": "H",
+    "value": 385,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "B",
+    "dimension": "sh",
+    "value": 187,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "C",
+    "dimension": "W",
+    "value": 284,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "C",
+    "dimension": "H",
+    "value": 275,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "D",
+    "dimension": "W",
+    "value": 252,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "D",
+    "dimension": "H",
+    "value": 275,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "D",
+    "dimension": "sh",
+    "value": 150,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "E",
+    "dimension": "W",
+    "value": 212,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "E",
+    "dimension": "H",
+    "value": 275,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "E",
+    "dimension": "sh",
+    "value": 141,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "F",
+    "dimension": "W",
+    "value": 458,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "F",
+    "dimension": "H",
+    "value": 145,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "G",
+    "dimension": "W",
+    "value": 278,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "G",
+    "dimension": "H",
+    "value": 185,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "G",
+    "dimension": "dv",
+    "value": -5,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "H",
+    "dimension": "W",
+    "value": 192,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "H",
+    "dimension": "H",
+    "value": 275,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "H",
+    "dimension": "sh",
+    "value": 190,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "I",
+    "dimension": "W",
+    "value": 284,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "I",
+    "dimension": "H",
+    "value": 195,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "I",
+    "dimension": "dv",
+    "value": -5,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "I",
+    "dimension": "sh",
+    "value": 145,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "J",
+    "dimension": "W",
+    "value": 434,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "J",
+    "dimension": "H",
+    "value": 157,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "K",
+    "dimension": "W",
+    "value": 498,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "K",
+    "dimension": "H",
+    "value": 170,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "L",
+    "dimension": "W",
+    "value": 248,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "L",
+    "dimension": "H",
+    "value": 230,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  },
+  {
+    "key": "L",
+    "dimension": "sh",
+    "value": 43,
+    "checks": "slider, nails, stock, marking, drawing, manual, STL four scales"
+  }
+]

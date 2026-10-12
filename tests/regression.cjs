@@ -4,10 +4,10 @@ const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
 new vm.Script(script);
 function between(a,b){return script.slice(script.indexOf(a),script.indexOf(b));}
 const code=between('const T=12','const stage=')+between('function checkAll(', 'const nestCv=')+between('function partTable(', 'function showTable(')+between('function validateDesign(', "$('openFile').onchange")+between('const SQ2=', 'const QUIZ=')+between('const QUIZ=', 'const QSCENE=');
-const context=vm.createContext({console});vm.runInContext(code,context);
+const context=vm.createContext({console});vm.runInContext(code+between('function stockMembers(', 'function nestHole('),context);
 const run=s=>vm.runInContext(s,context);
 function select(k){run(`state.work='${k}';state.dims={};state.corners={};state.hole=null;state.handle=false;state.off={};state.nestX={};state.refs=[];LBLKEY='';`);}
-for(const k of 'ABCDEFGHIJ'){
+for(const k of 'ABCDEFGHIJKL'){
  select(k);
  assert.equal(run('nest(parts()).left.length'),0,k+' stock');
  assert(run('nailSpots(parts()).every(n=>n.valid)'),k+' nails');
@@ -40,7 +40,7 @@ run('var refresh=()=>{};');
 select('B');assert.equal(run("trySetDim('sh',302,true)"),false);
 select('H');assert.equal(run("trySetDim('sh',244,true)"),false);
 let accepted=0;
-for(const k of 'ABCDEFGHIJ'){
+for(const k of 'ABCDEFGHIJKL'){
  select(k);const defs=run('WORKS[state.work].dims');
  for(const t of defs){
   select(k);const lim=run(`dimLim(WORKS[state.work].dims.find(t=>t.k==='${t.k}'),dimsOf())`);
@@ -65,7 +65,7 @@ assert(canvasText.includes('105.5'));assert(canvasText.includes('111.5'));assert
 assert(!canvasText.includes('112'));
 canvasText.length=0;select('I');run("state.showDim=true;state.sel='b1';drawDim()");
 assert(canvasText.some(t=>t.includes('左143 下27')));
-for(const k of 'ABCDEFGHIJ'){
+for(const k of 'ABCDEFGHIJKL'){
  select(k);
  const ids=run('parts().map(p=>p.id)');
  for(const id of ids){

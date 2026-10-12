@@ -22,7 +22,7 @@ function inspect(divisor){
  assert(Math.abs(lo[2])<0.001);assert(Math.abs(lo[0]+hi[0])<0.001);
  return count;
 }
-for(const k of 'ABCDEFGHIJ'){
+for(const k of 'ABCDEFGHIJKL'){
  run(`state.work='${k}';state.dims={};state.corners={};state.off={};state.hole=null;state.handle=false;state.refs=[];`);
  for(const d of [2,3,5,10])inspect(d);
 }
@@ -36,4 +36,13 @@ run("state.refs=[{kind:'book',w:100,h:100,d:100,pos:[999,999,999]}]");
 assert.deepEqual(Buffer.from(run('buildSTL(5)')),Buffer.from(before));
 assert.throws(()=>run('buildSTL(4)'));
 assert(html.includes('#stage canvas{display:block;width:100%;height:100%}'));
-console.log('PASS: A–J at all four scales, binary STL dimensions, Z-up/ground, rounded corners, cable/hand holes, reference exclusion');
+for(const [key,volume] of [['K',1680120.0],['L',2301840]]){
+ run(`state.work='${key}';state.dims={};state.corners={};state.off={};state.hole=null;state.handle=false;state.refs=[];`);
+ const v=new DataView(run('buildSTL(2)'));let signed=0;
+ for(let i=0;i<v.getUint32(80,true);i++){
+  const o=84+i*50+12,a=[0,1,2].map(j=>v.getFloat32(o+j*4,true)),b=[0,1,2].map(j=>v.getFloat32(o+12+j*4,true)),c=[0,1,2].map(j=>v.getFloat32(o+24+j*4,true));
+  signed+=(a[0]*(b[1]*c[2]-b[2]*c[1])+a[1]*(b[2]*c[0]-b[0]*c[2])+a[2]*(b[0]*c[1]-b[1]*c[0]))/6;
+ }
+ assert(Math.abs(Math.abs(signed)-volume/8)<.01,key+' true solid volume');
+}
+console.log('PASS: A–L at all four scales, binary STL dimensions, K/L actual solid volumes, Z-up/ground, corners/holes, reference exclusion');
