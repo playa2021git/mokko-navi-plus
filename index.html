@@ -3376,12 +3376,15 @@ $('stlForm').onsubmit=async e=>{
   e.preventDefault();$('stlError').textContent='';
   const button=e.submitter;
   try{
+    const batch=stlBatch,range=$('stlRange').value;
     const name=stlFilename(), divisor=Number($('stlScale').value);
+    // 保存ダイアログを開く前に、選択範囲と生成内容を確定する。
+    const data=batch?buildAllSTL(divisor,range):buildSTL(divisor);
     button.disabled=true;
     // Open the native picker while the submit still has user activation.
     const handle=window.showSaveFilePicker?await window.showSaveFilePicker({suggestedName:name,
       types:[{description:'STLファイル',accept:{'model/stl':['.stl']}}]}):null;
-    const blob=new Blob([stlBatch?buildAllSTL(divisor,$('stlRange').value):buildSTL(divisor)],{type:'model/stl'});
+    const blob=new Blob([data],{type:'model/stl'});
     if(handle){const stream=await handle.createWritable();await stream.write(blob);await stream.close();}
     else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
     $('stlDialog').close();
