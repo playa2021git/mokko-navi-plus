@@ -276,6 +276,18 @@ body.dim main{height:calc(100vh - 42px)}
   .bottom{height:228px}
   .card canvas{height:64px}
 }
+/* 学習の手がかり：操作直後に一度だけ。寸法や形状そのものは動かさない。 */
+.learning-status{position:absolute;top:92px;left:12px;right:12px;z-index:3;pointer-events:none;color:#245c89;font-size:11px}
+.learn-cue{outline:2px solid #2871a8;outline-offset:1px;animation:learn-emphasis .9s ease-out 1}
+@keyframes learn-emphasis{from{box-shadow:0 0 0 4px #2871a844}to{box-shadow:0 0 0 0 #2871a800}}
+.nail-trigger{cursor:pointer;outline:none}.nail-trigger:focus-visible{outline:1px solid #2871a8}
+.measure-cue{pointer-events:none;fill:none;stroke:#245fa2;stroke-width:.7}
+.measure-cue path{stroke-dasharray:100;animation:measure-draw .65s ease-out 1 both}
+.measure-cue path+path{animation-delay:.15s}
+@keyframes measure-draw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+.measure-readout{font-size:12px;color:#245c89;padding:5px 12px;background:#f5f8fa;border-bottom:1px solid #d8e1e8}
+@media(prefers-reduced-motion:reduce){.learn-cue,.measure-cue path{animation:none!important}.acc>h2::before{transition:none}}
+@media print{.learning-status,.measure-readout,.measure-cue{display:none!important}.nail-trigger{outline:none!important}.learn-cue{animation:none!important;outline:none!important;box-shadow:none!important}}
 </style>
 </head>
 <body>
@@ -328,6 +340,7 @@ body.dim main{height:calc(100vh - 42px)}
       <button id="endBtn">材料の両はし</button><button id="dimBtn">寸法を見る</button>
     </div>
     <canvas id="dimCv" hidden></canvas>
+    <div class="learning-status" id="learningStatus" role="status" aria-live="polite">板を選ぶと、3Dと材料取り図で同じ板を確認できます。</div>
     <div class="hint" id="hint"></div>
   </section>
 
@@ -454,6 +467,7 @@ body.dim main{height:calc(100vh - 42px)}
     <label style="font-size:12px">名前
       <input id="whoIn" type="text" placeholder="1年1組1番 ○○" style="width:150px"></label>
     <button id="sPrint">印刷する</button></div>
+  <div class="measure-readout" id="measureReadout" role="status" aria-live="polite">釘位置図の釘番号を選ぶと、板の端からの測り方を確認できます。</div>
   <div class="pbody" id="sBody"></div>
 </div>
 
@@ -748,7 +762,7 @@ const REF_KINDS={
    ========================================================= */
 const state={ work:'A', corners:{}, off:{}, refs:[], nextRef:1, sel:null, selKind:'part',
   showNails:false, showDim:false, showNames:true, showEnds:false, room:false, scene:'desk',
-  nestX:{}, flip:{}, screen:'main', drawZoom:null,
+  nestX:{}, nestBoard:{}, flip:{}, screen:'main', drawZoom:null,
   quiz:null, reco:null, refFull:null, // そうだんの答え・おすすめ作品・入りきらなかった物
   warned:false,        // 「材料の右はしが余っている」に一度OKしたか
   who:'',              // 名前（説明書に印刷する）
@@ -846,20 +860,22 @@ function hitBox(a,b,t=0.6){ return [0,1,2].every(i=>a.min[i]<b.max[i]-t && b.min
 /* =========================================================
    5) 材料取り（600mmの棒を切り分けるだけ）
    ========================================================= */
-function nest(ps){
+function nest(ps,useLayout=true){
+  const assigned=useLayout?state.nestBoard:{},positions=useLayout?state.nestX:{};
   const boards=STOCK.map(s=>({...s,placed:[],cursor:0}));
   /* nestKey が同じ部品は、1枚の切れ端から取る（取っ手など） */
   const seen=new Set(), items=[];
   for(const p of ps){
     if(p.nestKey){ if(seen.has(p.nestKey)) continue; seen.add(p.nestKey); }
     items.push({id:p.id,label:p.nestLabel||p.label||p.name,len:p.nestLen||Math.round(cutLen(p)),bw:p.nestBw||p.bw,
-      process:p.process,members:p.process?ps.filter(q=>q.nestKey===p.nestKey).map(q=>q.id):[p.id]});
+      process:p.process,members:p.nestKey?ps.filter(q=>q.nestKey===p.nestKey).map(q=>q.id):[p.id]});
   }
   items.sort((a,b)=>b.len-a.len);
   /* 初めは左から順に並べるだけ。どこに置くかは生徒が決める。 */
   /* 縦びきはしないので、板はばがぴったり同じ材料にしか置けない */
   const put=it=>{
     for(const bd of boards){
+      if(assigned[it.id] && assigned[it.id]!==bd.id) continue;
       if(bd.h!==it.bw) continue;
       const x = bd.cursor ? bd.cursor+KERF : 0;
       if(x+it.len > bd.w) continue;
@@ -876,7 +892,8 @@ function nest(ps){
       if(i===items.length)return true;
       const it=items[i],tried=new Set();
       for(let j=0;j<boards.length;j++){
-        const b=boards[j];if(b.h!==it.bw||tried.has(used[j]))continue;
+        const b=boards[j];if(assigned[it.id] && assigned[it.id]!==b.id)continue;
+        if(b.h!==it.bw||(!Object.keys(assigned).length&&tried.has(used[j])))continue;
         tried.add(used[j]);const before=used[j],x=before?before+KERF:0;
         if(x+it.len>b.w)continue;
         used[j]=x+it.len;assignment[i]={j,x};
@@ -895,9 +912,10 @@ function nest(ps){
     /* 初期位置は左詰め。保存した位置を全て反映してから制約を確認する。
        接合面による並べ替え・右端への自動配置・自動反転は行わない。 */
     for(const q of bd.placed){
-      const mx=state.nestX[q.id];
+      const mx=positions[q.id];
       if(mx!==undefined)q.x=Math.max(0,Math.min(bd.w-q.len,mx));
     }
+    bd.placed.sort((a,b)=>a.x-b.x);
     let edge=bd.w;
     for(let i=bd.placed.length-1;i>=0;i--){
       const q=bd.placed[i];q.x=Math.min(q.x,edge-q.len);edge=q.x-KERF;
@@ -925,6 +943,39 @@ function nestRange(ps,id){
                  hi:(next?next.x-KERF:bd.w)-q.len};
   }
   return null;
+}
+
+/* 材料間の移動・交換。完成品の形は変えず、共通材はまとめて動かす。 */
+function moveStockPart(id,boardId,x=0,swapId=null){
+  const ps=parts(),source=nestRange(ps,id),target=STOCK.find(b=>b.id===boardId);
+  if(!source||!target||source.q.bw!==target.h)return false;
+  const other=swapId?nestRange(ps,swapId):null;
+  if(swapId&&(!other||other.bd.id!==boardId||other.q.bw!==source.q.bw))return false;
+  if(source.bd.id===boardId)return false;
+  const previousBoard=state.nestBoard,previousX=state.nestX;
+  const boards=nest(ps).boards;
+  state.nestBoard=Object.fromEntries(boards.flatMap(b=>b.placed.map(q=>[q.id,b.id])));
+  state.nestX=Object.fromEntries(boards.flatMap(b=>b.placed.map(q=>[q.id,q.x])));
+  state.nestBoard[source.q.id]=boardId;
+  state.nestX[source.q.id]=other?other.q.x:Math.max(0,Math.min(target.w-source.q.len,x));
+  if(other){state.nestBoard[other.q.id]=source.bd.id;state.nestX[other.q.id]=source.q.x;}
+  const next=nest(ps);
+  if(next.left.length){state.nestBoard=previousBoard;state.nestX=previousX;return false;}
+  // Keep the actual, constrained positions so later edits and JSON use the same layout.
+  state.nestX=Object.fromEntries(next.boards.flatMap(b=>b.placed.map(q=>[q.id,q.x])));
+  state.warned=false;return true;
+}
+function floorFlipCandidate(ps,id){
+  const p=ps.find(p=>p.id===id),group=nestRange(ps,id);
+  if(!p||!group||group.q.process||!isVerticalBoard(p)||Math.abs(bbox(p).min[1])>.6)return null;
+  const f=factoryEnds(ps).get(id),{ax,s}=endAxis(p);
+  if(ax!==1||!f||f.s===f.e)return null;
+  const sign=f.s?s:-s;
+  return sign>0&&supportedEnd(p,-1,ps)?group:null;
+}
+function flipToFloor(id){
+  const group=floorFlipCandidate(parts(),id);if(!group)return false;
+  state.flip[group.q.id]=!stockFlip(group.q);state.warned=false;return true;
 }
 
 /* 部品ごとに「製材所が切った端」がどちらかを調べる。
@@ -958,7 +1009,7 @@ function factoryEnds(ps){
         const reversed=!!p.stockReverse;
         m.set(id,{s:reversed?e.e:e.s,e:q.process==='zigzag'?false:e.e});
       }
-    }else m.set(q.id,e);
+    }else for(const id of q.members||[q.id])m.set(id,{...e});
   }
   return m;
 }
@@ -1254,7 +1305,7 @@ function assembly(ps){
    ========================================================= */
 function workload(key){
   const ps=(key===state.work)?parts():baseParts(key);
-  const {boards,left}=nest(ps);
+  const {boards,left}=nest(ps,key===state.work);
   const cuts=boards.reduce((n,b)=>n+b.placed.reduce((n,q,i)=>n+(q.endS?0:((i>0&&Math.abs(q.x-(b.placed[i-1].x+b.placed[i-1].len)-KERF)<0.01)?0:1))+(q.endE?0:1),0),0);       // 切り分ける回数
   const corners=ps.reduce((n,p)=>n+(p.corners||p.c).filter(c=>c.type!=='none').length,0);
   const as=assembly(ps);
@@ -1268,9 +1319,7 @@ function workload(key){
    ========================================================= */
 function isVerticalBoard(p){return p.posture==='side'||(p.posture==='front'&&lenAxis(p)==='h');}
 function nailDatum(p,ps=parts()){
-  const f=factoryEnds(ps).get(p.id);
-  const right=lenAxis(p)==='w'&&f&&f.e&&!f.s;
-  return {x:right?p.w:0,y:0,xLabel:right?'右基準端':'左基準端',yLabel:isVerticalBoard(p)?'地':'下端',nearest:p.posture==='front'&&!isVerticalBoard(p)};
+  return {x:0,y:0,xLabel:'左端',yLabel:isVerticalBoard(p)?'地':'下端',nearest:true};
 }
 function nailCoordinates(p,ps=parts()){
   const datum=nailDatum(p,ps);
@@ -1280,6 +1329,43 @@ function nailCoordinates(p,ps=parts()){
   });
 }
 const stage=$('stage');
+const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
+let learningIds=new Set(),learningTimer=null,highlightModel=()=>{};
+let designReadId=0,designReading=false;
+function clearLearningCue(){
+  clearTimeout(learningTimer);learningIds=new Set();highlightModel([]);
+  document.querySelectorAll('.learn-cue').forEach(e=>e.classList.remove('learn-cue'));
+}
+function focusParts(ids,message){
+  clearLearningCue();
+  const ps=parts();ids=[...new Set(ids)].filter(id=>ps.some(p=>p.id===id));if(!ids.length)return;
+  state.sel=ids[0];state.selKind='part';learningIds=new Set(ids);
+  refresh();
+  $('learningStatus').textContent=message||ps.filter(p=>ids.includes(p.id)).map(p=>p.label).join('・')+'：一覧・3D・材料取り図で同じ板です。';
+  $('parts').querySelectorAll('[data-part-id]').forEach(b=>{if(learningIds.has(b.dataset.partId))b.classList.add('learn-cue');});
+  if(!reducedMotion.matches)highlightModel(ids);
+  learningTimer=setTimeout(()=>{clearLearningCue();drawNest();markDirty();},1100);
+}
+reducedMotion.addEventListener('change',()=>{clearLearningCue();drawNest();markDirty();});
+function refreshDesignDocuments(){
+  if($('view').hidden&&$('sheet').hidden)return;
+  const ps=parts(),invalid=nest(ps).left.length||overlappingParts(ps).length||nailSpots(ps,true).some(n=>!n.valid);
+  const blocked='<p role="alert">現在の設計は材料不足・板の重なり・釘の進路を確認する必要があります。②3Dで修正してください。</p>';
+  if(!$('view').hidden)$('vBody').innerHTML=invalid?blocked:drawViewSheet();
+  if(!$('sheet').hidden){$('sBody').innerHTML=invalid?blocked:manualSheet();$('measureReadout').textContent='釘位置図の釘番号を選ぶと、板の端からの測り方を確認できます。';}
+}
+window.addEventListener('beforeprint',refreshDesignDocuments);
+function showNailMeasure(trigger){
+  const face=trigger.closest('[data-nail-part]'),svg=trigger.closest('svg');
+  if(!face||!svg)return;
+  document.querySelectorAll('.measure-cue').forEach(e=>e.remove());
+  const {gx,gy,nx,ny}=trigger.dataset;
+  const overlay=document.createElementNS('http://www.w3.org/2000/svg','g');overlay.setAttribute('class','measure-cue');
+  overlay.innerHTML=`<path pathLength="100" d="M${gx},${ny} L${nx},${ny}"/><path pathLength="100" d="M${nx},${gy} L${nx},${ny}"/><circle cx="${nx}" cy="${ny}" r="2"/>`;
+  face.appendChild(overlay);$('measureReadout').textContent=trigger.getAttribute('aria-label')+'。隣の釘からではなく、板の端から測ります。';
+}
+$('sBody').addEventListener('click',e=>{const t=e.target.closest('[data-nail-trigger]');if(t)showNailMeasure(t);});
+$('sBody').addEventListener('keydown',e=>{const t=e.target.closest('[data-nail-trigger]');if(t&&(e.key==='Enter'||e.key===' ')){e.preventDefault();showNailMeasure(t);}});
 const HAS3D=(typeof THREE!=='undefined');
 let buildSTL=null;
 let rebuild=()=>{}, fitView=()=>{}, fitRoom=()=>{}, resize=()=>{}, markDirty=()=>{};
@@ -1551,19 +1637,26 @@ if(HAS3D){
   }
   const GRAIN={x:grainTex(false), y:grainTex(true)};
   const TONE={wood:0xd9a86b, sel:0xc2694a, warn:0xcf9aa4};
-  const MATS={}, CLEARMATS=[];
+  const MATS={};
   function woodMat(dir,kind,clear){
     const ends=clear==='ends';
     const k=dir+'-'+kind+(ends?'-ends':clear?'-c':'');
     if(!MATS[k]){
       MATS[k]=new THREE.MeshLambertMaterial({map:GRAIN[dir],color:TONE[kind],
-        transparent:!!clear, opacity:ends?.38:1, depthWrite:!clear});
-      if(clear&&!ends) CLEARMATS.push(MATS[k]);
+        transparent:!!clear, opacity:ends?.38:clear?.5:1, depthWrite:!clear});
     }
     return MATS[k];
   }
   function grainDir(p){ return grainVertical(p) ? 'y' : 'x'; }
   const EDGE=new THREE.LineBasicMaterial({color:0x6b5233,transparent:true,opacity:.5});
+  const FOCUS_EDGE=new THREE.LineBasicMaterial({color:0x2871a8,transparent:true,opacity:1,depthTest:false});
+  highlightModel=ids=>{
+    for(const g of group.children)if(g.userData.kind==='part'){
+      const edge=g.children.find(o=>o.type==='LineSegments');if(!edge)continue;
+      const active=ids.includes(g.userData.id);edge.material=active?FOCUS_EDGE:EDGE;edge.renderOrder=active?9991:0;
+    }
+    markDirty();
+  };
   const orbit={yaw:-0.72,pitch:0.42,dist:800,target:new THREE.Vector3(0,90,0)};
 
   function applyCam(){ const{yaw,pitch,dist,target}=orbit;
@@ -1899,7 +1992,7 @@ if(HAS3D){
       const h=drag.hit||hitObj(e);
       if(h){ state.sel=h.id; state.selKind=h.kind; }
       else if(state.selKind==='ref'){ state.selKind='part'; state.sel=parts()[0].id; }
-      refresh();
+      if(h&&h.kind==='part')focusParts([h.id]);else refresh();
     } drag=null;
   });
   renderer.domElement.addEventListener('wheel',e=>{ e.preventDefault();
@@ -1936,7 +2029,7 @@ if(HAS3D){
      ずっと毎秒60回描き直すと、非力なChromebookでは操作までもたつく。
      カメラが動いたときと、作り直したときだけ描く。
      釘モードだけは濃さが変わり続けるので、1秒に20回に間引いて描く。 */
-  let dirty=true, lastCam='', lastPulse=0;
+  let dirty=true, lastCam='';
   markDirty=()=>{ dirty=true; };
   (function loop(){
     requestAnimationFrame(loop);
@@ -1944,17 +2037,6 @@ if(HAS3D){
     const sig=`${o.yaw.toFixed(4)},${o.pitch.toFixed(4)},${o.dist.toFixed(1)},`
              +`${o.target.x.toFixed(1)},${o.target.y.toFixed(1)},${o.target.z.toFixed(1)}`;
     if(sig!==lastCam){ lastCam=sig; dirty=true; }
-    if(state.showNails&&!state.showEnds){
-      const now=performance.now();
-      if(now-lastPulse>50){                                   // 1秒に20回まで
-        lastPulse=now;
-        const ph=(Math.sin(now/3000*Math.PI)+1)/2;            // 1往復6秒
-        for(const m of CLEARMATS) m.opacity=0.5+0.5*ph;
-        dirty=true;
-      }
-    }else if(CLEARMATS.some(m=>m.opacity!==1)){
-      for(const m of CLEARMATS) m.opacity=1; dirty=true;
-    }
     if(!dirty) return;
     dirty=false;
     nailGroup.visible = state.showNails;
@@ -1976,17 +2058,17 @@ function checkAll(ps,leftOver){
     const r=state.refs.find(x=>x.id===id); return r?REF_KINDS[r.kind].label:id; };
 
   if(leftOver&&leftOver.length){
-    msgs.push({lv:'bad',t:`材料が足りません：${leftOver.map(i=>i.label).join('・')}`});
+    msgs.push({lv:'bad',ids:leftOver.flatMap(i=>i.members||[i.id]),t:`材料が足りません：${leftOver.map(i=>i.label).join('・')}`});
     leftOver.forEach(i=>bad.add(i.id));
   }
   for(const [a,b] of overlappingParts(ps)){
     bad.add(a.id); bad.add(b.id);
-    msgs.push({lv:'bad',t:`${a.label}と${b.label}が重なっています。この寸法では組み立てられません。`});
+    msgs.push({lv:'bad',ids:[a.id,b.id],t:`${a.label}と${b.label}が重なっています。この寸法では組み立てられません。`});
   }
   const invalid=nailSpots(ps,true).filter(n=>!n.valid);
   if(invalid.length){
     invalid.forEach(n=>{bad.add(n.driver);bad.add(n.into);});
-    msgs.push({lv:'bad',t:'角の加工または穴が釘の位置・進路（26mmの釘を想定）と重なっています。加工を見直してください（該当する釘は表示していません）。'});
+    msgs.push({lv:'bad',ids:[...new Set(invalid.flatMap(n=>[n.driver,n.into]))],t:'角の加工または穴が釘の位置・進路（26mmの釘を想定）と重なっています。加工を見直してください（該当する釘は表示していません）。'});
   }
   /* 段差（自分で動かした板だけ見る。同じ原因は1回だけ） */
   const AX=['左右','上下','前後'],seen=new Set();
@@ -2024,7 +2106,7 @@ function checkAll(ps,leftOver){
     if(!rp.length) msgs.push({lv:'warn',
       t:'まだ製材所の端を使っていません。材料取り図で部品を材料の端までドラッグしてみましょう。'});
     for(const r of waste.slice(0,4)){
-      msgs.push({lv:'warn',t:`${r.label}のきれいな面が${r.where}側で、何とも接していません。もったいない使い方です。`});
+      msgs.push({lv:'warn',ids:[r.id],t:`${r.label}のきれいな面が${r.where}側で、何とも接していません。もったいない使い方です。`});
       bad.add(r.id);
     }
     const good=rp.filter(r=>r.ok||r.fair);
@@ -2213,10 +2295,11 @@ function drawNest(){
   nestCv.width=w*dpr; nestCv.height=h*dpr;
   const g=nestCv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
   const {labelW,gapMM,sc,ox}=boardRows(w,h);
-  nestHit=[];
+  nestHit=[]; nestRows=[];
   g.font='10px system-ui'; let oy=3;
   for(const b of boards){
     const bw=b.w*sc, bh=b.h*sc;
+    nestRows.push({id:b.id,x0:ox,x1:ox+bw,y0:oy,y1:oy+bh,sc,ox});
     g.fillStyle='#7b7166';
     g.fillText(`材料${b.id}`, ox-labelW, oy+bh/2-1);
     g.fillText(`幅${b.h}`,    ox-labelW, oy+bh/2+10);
@@ -2231,6 +2314,7 @@ function drawNest(){
       g.fillStyle=sel?'#c2694a':'#d9a86b';
       g.fillRect(x,oy,pw,bh);
       g.strokeStyle='#6b5233'; g.lineWidth=1; g.strokeRect(x+.5,oy+.5,pw,bh);
+      if((q.members||[q.id]).some(id=>learningIds.has(id))){g.save();g.strokeStyle='#2871a8';g.lineWidth=3;g.strokeRect(x+1.5,oy+1.5,pw-3,bh-3);g.restore();}
       if(pw>46&&bh>13){ g.fillStyle=sel?'#fff':'#3f3225';
         g.fillText(`${q.label}`,x+3,oy+bh/2-1); g.fillText(`${q.len}`,x+3,oy+bh/2+10); }
       else if(pw>26){ g.fillStyle=sel?'#fff':'#3f3225'; g.fillText(`${q.len}`,x+2,oy+bh/2+4); }
@@ -2273,16 +2357,19 @@ function drawNest(){
   $('nestNote').innerHTML = (left.length
     ? `／ 取れない板：${left.map(i=>i.label).join('・')}`
     : (state.showEnds
-        ? `／ <span style="color:#00a344">緑＝製材所が切った端</span>・部品を左右にドラッグすると材料の端でパチッと止まります`
-        : `／ 部品を左右にドラッグできます（赤い帯は切りしろ ${KERF}mm）`))
+        ? `／ <span style="color:#00a344">緑＝製材所が切った端</span>・左右で位置調整、A/Bの行をまたいで移動・交換できます`
+        : `／ 左右で位置調整・A/Bの行をまたいで移動・部品の上で交換（切りしろ ${KERF}mm）`))
     + (boards.some(b=>b.placed.length&&b.placed.at(-1).x+b.placed.at(-1).len<b.w-.5)?'<br>材料の右端にも、製材所で切られた面があります。部品を移動して活用できないか考えてみよう。接合や接地に適した場所で使えるかを考え、使わない選択もできます。':'')
+    + ps.filter(p=>floorFlipCandidate(ps,p.id)).map(p=>'<br><span style="color:#b0463c">'+esc(p.label)+'：工場カット面が天を向いています。</span> <button data-floor-flip="'+p.id+'">接地側に反転</button>').join('')
+    + (nestMessage?'<br><b role="status">'+esc(nestMessage)+'</b>':'')
     + (hn.length?'<br>'+hn.join('　／　')+'　※穴も左右にドラッグできます':'')
     + (WORKS[state.work].original?'<br>'+esc(processNotes(ps)[0]):'');
+  $('nestNote').querySelectorAll('[data-floor-flip]').forEach(b=>b.onclick=()=>{if(flipToFloor(b.dataset.floorFlip))focusParts([b.dataset.floorFlip],'工場カット面を接地側へ変更しました。完成形の寸法は変わりません。');});
   return left;
 }
 
 /* --- 材料取り図のドラッグ：材料の端や隣の部品にスナップ --- */
-let nestDrag=null;
+let nestDrag=null, nestRows=[], nestMessage='';
 function nestPick(e){
   const r=nestCv.getBoundingClientRect();
   const x=e.clientX-r.left, y=e.clientY-r.top;
@@ -2297,7 +2384,7 @@ nestCv.addEventListener('pointerdown',e=>{
                         flip:false}; return; }
   state.sel=t.id; state.selKind='part';
   const rg=nestRange(parts(),t.id);
-  nestDrag={id:t.id, sc:t.sc, ox:t.ox, len:t.len, startX:e.clientX,
+  nestDrag={id:t.id, sc:t.sc, ox:t.ox, len:t.len, startX:e.clientX, originalX:{...state.nestX},
             base:(t.x0-t.ox)/t.sc, lo:rg?rg.lo:0, hi:rg?rg.hi:600-t.len, bw:rg?rg.bd.w:600};
   refresh();
 });
@@ -2305,6 +2392,10 @@ nestCv.addEventListener('pointermove',e=>{
   if(!nestDrag) return;
   const d=(e.clientX-nestDrag.startX)/nestDrag.sc;
   if(nestDrag.hole){ moveHoleBy(nestDrag.hole, nestDrag.base, d); return; }
+  const r=nestCv.getBoundingClientRect(),y=e.clientY-r.top;
+  const row=nestRows.find(b=>y>=b.y0&&y<=b.y1);
+  const current=nestRange(parts(),nestDrag.id);
+  if(row&&current&&row.id!==current.bd.id)return;
   let x=Math.max(nestDrag.lo,Math.min(nestDrag.hi,nestDrag.base+d));
   /* スナップ：材料の左端・右端・動ける限界 */
   const SNAP=14;
@@ -2316,7 +2407,18 @@ nestCv.addEventListener('pointermove',e=>{
   state.warned=false;
   refresh();
 });
-nestCv.addEventListener('pointerup',()=>{ nestDrag=null; });
+nestCv.addEventListener('pointerup',e=>{
+  const d=nestDrag;nestDrag=null;if(!d||d.hole)return;
+  const r=nestCv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+  const row=nestRows.find(b=>x>=b.x0&&x<=b.x1&&y>=b.y0&&y<=b.y1);
+  const source=nestRange(parts(),d.id);if(!row||!source||row.id===source.bd.id)return;
+  const hit=nestHit.find(t=>!t.hole&&t.id!==d.id&&x>=t.x0&&x<=t.x1&&y>=t.y0&&y<=t.y1);
+  state.nestX=d.originalX;
+  const ok=moveStockPart(d.id,row.id,Math.round((x-row.ox)/row.sc-d.len/2),hit?hit.id:null);
+  nestMessage=ok?(hit?'材料の部品を交換しました。':'別の材料へ移動しました。')
+    :(row.id==='C'||source.bd.id==='C'?'材料A・Bと材料Cは交換できません。':'材料に収まりません。左右の側板の高さなどを縮めてから交換してください。');
+  refresh();
+});
 nestCv.addEventListener('pointercancel',()=>{ nestDrag=null; });
 
 /* =========================================================
@@ -2416,7 +2518,7 @@ function drawDim(){
     g.strokeStyle='#fff'; g.lineWidth=1.4; g.stroke();
   }
 
-  // Each nail uses the designated datum; never the nearest edge or a chained distance.
+  // Vertical dimensions start at the lower datum; horizontal dimensions start at a board end, never another nail.
   yValues.forEach((fy,i)=>{
     guide(X(0),Y(fy),ox-24-i*18,Y(fy));
     dimV(Y(0),Y(fy),ox-24-i*18,mm(fy),'#d9007e');
@@ -2495,6 +2597,20 @@ function drawSheet(){
   if($('draw').hidden) return;
   const ps=parts(), {boards}=nest(ps);
   const zoom=state.drawZoom, list=zoom?boards.filter(b=>b.id===zoom):boards;
+  $('dNail').className=state.showNails?'on':'';
+  $('dsub').innerHTML = (zoom ? `材料${zoom}を大きく表示中` : '板をクリックすると大きくなります')
+    + (isOriginal()?' ／ <b style="color:#b8761c">あなたのオリジナル寸法です（説明書の数字とはちがいます）</b>':'');
+  $('dZoomOut').hidden = !zoom;
+  $('dfoot').innerHTML =
+    '<b>使い方</b>　上の数字が「材料の左端から何mm」。下の数字が「部品1つ分の長さ」。'
+    +'<span style="color:#00a344">緑＝製材所が切った端（そのまま使える）</span>／'
+    +`<span style="color:#b0463c">赤い帯＝のこぎりの通り道（切りしろ${KERF}mm）</span>。`
+    +'けがきは<b>仕上がり線</b>と<b>切断線</b>の2本を引きましょう。'
+    +(WORKS[state.work].original?'<br>'+processNotes(ps).map(esc).join('<br>'):'')
+    +(isOriginal()&&state.comment
+      ? `<br><span style="color:#b8761c">あなたのオリジナル寸法の理由：${
+          state.comment.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</span>`
+      : '');
   const dpr=Math.min(devicePixelRatio||1,2);
   const W=drawCv.clientWidth,H=drawCv.clientHeight; if(!W||!H) return;
   drawCv.width=W*dpr; drawCv.height=H*dpr;
@@ -2549,7 +2665,8 @@ function drawSheet(){
       sheetHit.push({board:b.id,x0:x,x1:x+pw,y0:oy,y1:oy+bh});
 
       for(const member of stockMembers(ps,q)){
-        const d=nailDatum(member,ps),marks=d.nearest?[[0,'▲左端'],[member.w,'▲右端']]:[[d.x,isVerticalBoard(member)?'▲地':'▲基準']];
+        const marks=[[0,'▲左端'],[member.w,'▲右端']];
+        if(isVerticalBoard(member))marks.push([member.w/2,'▲地']);
         g.save();g.fillStyle='#243b82';g.font='10px system-ui';g.textAlign='left';
         for(const [fx,label] of marks){const pt=stockPoint(member,q,fx,0);g.fillText(label,x+pt[0]*sc,oy+pt[1]*sc-5);}g.restore();
       }
@@ -2635,21 +2752,6 @@ function drawSheet(){
     g.fillText('左端から', ox+bw+28, yt);
     g.fillText('部品の長さ', ox+bw+28, yb);
   });
-
-  $('dNail').className=state.showNails?'on':'';
-  $('dsub').innerHTML = (zoom ? `材料${zoom}を大きく表示中` : '板をクリックすると大きくなります')
-    + (isOriginal()?' ／ <b style="color:#b8761c">あなたのオリジナル寸法です（説明書の数字とはちがいます）</b>':'');
-  $('dZoomOut').hidden = !zoom;
-  $('dfoot').innerHTML =
-    '<b>使い方</b>　上の数字が「材料の左端から何mm」。下の数字が「部品1つ分の長さ」。'
-    +'<span style="color:#00a344">緑＝製材所が切った端（そのまま使える）</span>／'
-    +`<span style="color:#b0463c">赤い帯＝のこぎりの通り道（切りしろ${KERF}mm）</span>。`
-    +'けがきは<b>仕上がり線</b>と<b>切断線</b>の2本を引きましょう。'
-    +(WORKS[state.work].original?'<br>'+processNotes(ps).map(esc).join('<br>'):'')
-    +(isOriginal()&&state.comment
-      ? `<br><span style="color:#b8761c">あなたのオリジナル寸法の理由：${
-          state.comment.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</span>`
-      : '');
 }
 drawCv.addEventListener('click',e=>{
   const r=drawCv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
@@ -2666,9 +2768,9 @@ function buildParts(ps){
   const list=$('parts'); list.innerHTML='';
   for(const p of ps){
     const b=document.createElement('button');
-    b.className=(state.selKind==='part'&&p.id===state.sel)?'on':'';
+    b.className=(state.selKind==='part'&&p.id===state.sel)?'on':'';b.dataset.partId=p.id;
     b.innerHTML=`<span>${p.label}${p.moved?' ✎':''}</span><span class="sz">${Math.round(cutLen(p))}×${p.bw}</span>`;
-    b.onclick=()=>{state.sel=p.id;state.selKind='part';refresh();};
+    b.onclick=()=>focusParts([p.id]);
     list.appendChild(b);
   }
   buildDims();
@@ -3052,9 +3154,11 @@ function makeDimDOM(){
     r.addEventListener('input',()=>{
       const k=r.dataset.d;
       /* ドラッグ中は、材料に入らない値なら黙って止めるだけ（説明はつまみを離してから） */
-      if(!trySetDim(k,+r.value,true)) r.value=dimsOf()[k];
+      const before=parts();
+      if(!trySetDim(k,+r.value,true))r.value=dimsOf()[k];
+      else r.changedParts=[...new Set([...(r.changedParts||[]),...parts().filter(p=>{const q=before.find(q=>q.id===p.id);return !q||JSON.stringify([p.w,p.h,p.pos])!==JSON.stringify([q.w,q.h,q.pos]);}).map(p=>p.id)])];
     });
-    const drop=()=>{ if(dimDrag===r){ dimDrag=null; refresh(); } };
+    const drop=()=>{if(dimDrag===r){dimDrag=null;refresh();}if(r.changedParts?.length){const ids=r.changedParts;r.changedParts=[];focusParts(ids,'寸法が変わった板です。けがき・見た目図・⑤説明書も現在の寸法で更新します。');}};
     r.addEventListener('change',drop);
     r.addEventListener('pointerup',drop);
     r.addEventListener('blur',drop);
@@ -3064,7 +3168,16 @@ function makeDimDOM(){
   $('size3').querySelectorAll('button.why').forEach(bt=>{
     bt.onclick=()=>limitDialog(bt.dataset.why,+bt.dataset.wv);
   });
-  $('dimReset').onclick=()=>{ state.dims={}; refresh(); };
+  $('dimReset').onclick=()=>{
+    const previous={dims:state.dims,hole:state.hole?{...state.hole}:null,handleY:state.handleY};
+    state.dims={};clampAll();
+    if(!fitsNow()){
+      Object.assign(state,previous);
+      askModal('いまの材料の割り当てでは初期寸法に戻せません',
+        '<p>材料A・Bの部品を入れ替えるか、高さ・外はばを調整してください。現在の設計は保持しました。</p>','戻る',null);
+    }else{state.warned=false;nestMessage='';}
+    refresh();
+  };
 }
 function buildDims(){
   if(dimKey!==state.work){ makeDimDOM(); dimKey=state.work; }
@@ -3073,7 +3186,7 @@ function buildDims(){
   const ob=box.querySelector('.orig');
   ob.hidden=!isOriginal();
   if(!ob.hidden) ob.innerHTML='<b>あなたのオリジナル寸法！</b>自分で大きさを考えたのはいいことです。'
-    +'説明書とは数字がちがうので、けがきは<b>この画面</b>の数字を使いましょう。';
+    +'配布された教材の初期寸法から変更しています。③けがき・④見た目図・⑤説明書には<b>変更後の寸法</b>を反映します。';
   box.querySelector('.bar').innerHTML=
      `外はば <b>${o.W}</b>・奥行 <b>${o.D}</b>・高さ <b>${o.H}</b> mm　板厚12<br>`
     +'右はしのあき：'+ boards.map(b=>`${b.id} <b>${tailRest(b)}</b>`).join(' / ')
@@ -3199,8 +3312,10 @@ function refresh(){
   $('nameBtn').className=state.showNames?'on':'';
   $('endBtn').className =state.showEnds?'on':'';
   drawDim(); showHint(); if(!$('draw').hidden) drawSheet();
-  $('msgs').innerHTML=msgs.map(m=>
-    `<div class="msg ${m.lv}"><span class="bd">${m.lv==='ok'?'✓':'!'}</span><span>${m.t}</span></div>`).join('');
+  $('msgs').innerHTML=msgs.map((m,i)=>
+    `<div class="msg ${m.lv}"><span class="bd">${m.lv==='ok'?'✓':'!'}</span><span>${m.t}${m.ids?.length?` <button data-find-issue="${i}">場所を確認</button>`:''}</span></div>`).join('');
+  $('msgs').querySelectorAll('[data-find-issue]').forEach(b=>b.onclick=()=>focusParts(msgs[+b.dataset.findIssue].ids,'確認が必要な板を示しています。材料取りと寸法を確認しましょう。'));
+  refreshDesignDocuments();
 }
 
 /* =========================================================
@@ -3263,7 +3378,7 @@ function buildCards(){
 }
 let savedDesign=null;
 function designFingerprint(){
-  return JSON.stringify([state.work,state.dims,state.corners,state.off,state.nestX,state.flip,
+  return JSON.stringify([state.work,state.dims,state.corners,state.off,state.nestX,state.nestBoard,state.flip,
     state.hole,state.handle,state.handleY,state.comment,state.who,state.refs,state.scene]);
 }
 function hasUnsavedChanges(){return savedDesign!==null&&savedDesign!==designFingerprint();}
@@ -3277,7 +3392,10 @@ function guardUnsaved(next){
 window.addEventListener('beforeunload',e=>{if(hasUnsavedChanges()){e.preventDefault();e.returnValue='';}});
 function chooseWork(key,discard=false){
   if(!discard&&hasUnsavedChanges()){guardUnsaved(()=>chooseWork(key,true));return;}
-  state.work=key; state.corners={}; state.off={}; state.nestX={}; state.flip={};
+  designReadId++;designReading=false;
+  clearLearningCue();$('learningStatus').textContent='板を選ぶと、3Dと材料取り図で同じ板を確認できます。';
+  nestMessage='';
+  state.work=key; state.corners={}; state.off={}; state.nestX={}; state.nestBoard={}; state.flip={};
   state.hole=null; state.handle=false; state.handleY=40;
   state.dims={}; state.comment=''; state.warned=false; dimKey=null; dimDrag=null;
   $('quiz').hidden=$('draw').hidden=$('view').hidden=$('sheet').hidden=true;
@@ -3321,7 +3439,7 @@ function buildAllSTL(divisor,keys='ABCDEFGHIJKL'){
   const saved={...state},oldLabels=LBL,oldKey=LBLKEY,models=[];
   try{
     for(const key of keys){
-      Object.assign(state,{work:key,dims:{},corners:{},off:{},nestX:{},flip:{},hole:null,handle:false});LBLKEY='';
+      Object.assign(state,{work:key,dims:{},corners:{},off:{},nestX:{},nestBoard:{},flip:{},hole:null,handle:false});LBLKEY='';
       const data=buildSTL(divisor),v=new DataView(data),count=v.getUint32(80,true),lo=[Infinity,Infinity],hi=[-Infinity,-Infinity];
       for(let n=0;n<count;n++)for(let j=0;j<3;j++)for(let a=0;a<2;a++){
         const x=v.getFloat32(84+n*50+12+j*12+a*4,true);lo[a]=Math.min(lo[a],x);hi[a]=Math.max(hi[a],x);
@@ -3392,8 +3510,8 @@ $('stlForm').onsubmit=async e=>{
   finally{button.disabled=false;}
 };
 function saveFile(){
-  const d=JSON.stringify({version:10,work:state.work,corners:state.corners,
-    off:state.off,nestX:state.nestX,flip:state.flip,
+  const d=JSON.stringify({version:11,work:state.work,corners:state.corners,
+    off:state.off,nestX:state.nestX,nestBoard:state.nestBoard,flip:state.flip,
     dims:state.dims,comment:state.comment,who:state.who,scene:state.scene,
     quiz:state.quiz,reco:state.reco,
     hole:state.hole,handle:state.handle,handleY:state.handleY,
@@ -3445,8 +3563,7 @@ function goScreen(k,skipCheck){
   state.screen=k;
   if(k==='main'){ resize(); refresh(); }
   if(k==='draw'){ state.drawZoom=null; requestAnimationFrame(()=>drawSheet()); }
-  if(k==='view'){ $('vBody').innerHTML=drawViewSheet(); }
-  if(k==='sheet'){ $('sBody').innerHTML=manualSheet(); }
+  if(k==='view'||k==='sheet')refreshDesignDocuments();
   for(const id of ['mSteps','dSteps','vSteps','sSteps','qSteps']) stepBar($(id),k);
 }
 function openDraw(){ goScreen('draw'); }
@@ -3497,13 +3614,13 @@ function endsDialog(bad,onYes){
 }
 $('save').onclick=saveFile;
 $('dBack').onclick=()=>goScreen('main');
-$('vPrint').onclick=()=>window.print();
-$('sPrint').onclick=()=>window.print();
+$('vPrint').onclick=()=>{refreshDesignDocuments();window.print();};
+$('sPrint').onclick=()=>{refreshDesignDocuments();window.print();};
 $('aboutBtn').onclick=()=>{ $('about').hidden=false; };
 $('aboutBtn2').onclick=()=>{ $('about').hidden=false; };
 $('abClose').onclick=()=>{ $('about').hidden=true; };
 $('whoIn').oninput=e=>{ state.who=e.target.value.slice(0,40);
-  if(!$('sheet').hidden) $('sBody').innerHTML=manualSheet(); };
+  if(!$('sheet').hidden)refreshDesignDocuments(); };
 $('dSave').onclick=saveFile;
 $('dNail').onclick=()=>{ state.showNails=!state.showNails; refresh(); drawSheet(); };
 $('dZoomOut').onclick=()=>{ state.drawZoom=null; drawSheet(); };
@@ -3513,8 +3630,8 @@ function validateDesign(d){
   const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
   const finite=x=>typeof x==='number'&&Number.isFinite(x);
   if(!object(d)||!Object.hasOwn(WORKS,d.work)) throw new Error('作品番号が不正です');
-  if(d.version!==undefined&&(!Number.isInteger(d.version)||d.version>10||d.version<1)) throw new Error('未対応の保存形式です');
-  for(const key of ['dims','corners','off','nestX','flip'])
+  if(d.version!==undefined&&(!Number.isInteger(d.version)||d.version>11||d.version<1)) throw new Error('未対応の保存形式です');
+  for(const key of ['dims','corners','off','nestX','nestBoard','flip'])
     if(d[key]!==undefined&&!object(d[key])) throw new Error(key+'の形式が不正です');
   for(const key of ['comment','who'])
     if(d[key]!==undefined&&typeof d[key]!=='string') throw new Error(key+'は文字列にしてください');
@@ -3530,6 +3647,12 @@ function validateDesign(d){
   for(const v of Object.values(d.nestX||{})) if(!finite(v)) throw new Error('材料位置が不正です');
   if(d.refs!==undefined&&(!Array.isArray(d.refs)||d.refs.some(r=>!object(r)||!Object.hasOwn(REF_KINDS,r.kind)||!['w','h','d'].every(k=>finite(r[k])&&r[k]>0&&r[k]<=600)||!Array.isArray(r.pos)||r.pos.length!==3||!r.pos.every(finite)))) throw new Error('収納物の形式が不正です');
   const ps=WORKS[d.work].make({...defDims(d.work),...d.dims});
+  const stockIds=new Map(ps.map(p=>[p.id,p]));
+  for(const [id,boardId] of Object.entries(d.nestBoard||{})){
+    const p=stockIds.get(id),b=STOCK.find(b=>b.id===boardId);
+    if(!p||!b||(p.nestBw||p.bw)!==b.h)throw new Error('材料の割り当てが不正です');
+  }
+  for(const v of Object.values(d.flip||{}))if(typeof v!=='boolean')throw new Error('反転の形式が不正です');
   if(d.hole&&(!object(d.hole)||!ps.some(p=>p.id===d.hole.id&&p.posture==='flat')||!finite(d.hole.x))) throw new Error('穴の形式が不正です');
   if(d.handleY!==undefined&&!finite(d.handleY)) throw new Error('手穴の位置が不正です');
   if(d.reco!=null&&(!Array.isArray(d.reco)||d.reco.some(r=>!object(r)||!Object.hasOwn(WORKS,r.key)||!Array.isArray(r.why)||r.why.some(t=>typeof t!=='string')))) throw new Error('推薦結果が不正です');
@@ -3538,10 +3661,14 @@ function validateDesign(d){
 }
 $('openFile').onchange=e=>{
   const f=e.target.files[0]; if(!f)return; const r=new FileReader();
-  r.onload=()=>{ const previous=JSON.parse(JSON.stringify(state)); try{
+  const readId=++designReadId,startedFrom=designFingerprint();designReading=true;
+  r.onload=()=>{
+    if(readId!==designReadId)return;
+    if(designFingerprint()!==startedFrom){designReading=false;$('learningStatus').textContent='読み込み中に設計が変更されたため、現在の設計を保持しました。必要ならもう一度ファイルを開いてください。';return;}
+    const previous=JSON.parse(JSON.stringify(state)); try{
       const d=validateDesign(JSON.parse(r.result));
       state.work=d.work; state.corners=d.corners||{}; state.off=d.off||{};
-      state.nestX=d.nestX||{}; state.flip=d.flip||{};
+      state.nestX=d.nestX||{}; state.nestBoard=d.nestBoard||{}; state.flip=d.flip||{};
       state.hole=d.hole||null; state.handle=!!d.handle; state.handleY=d.handleY??40;
       state.dims=d.dims||{}; state.comment=d.comment||''; state.who=d.who||'';
       state.scene=SCENES[d.scene]?d.scene:'desk';
@@ -3550,6 +3677,7 @@ $('openFile').onchange=e=>{
       const wi=$('whoIn'); if(wi) wi.value=state.who;
       state.refs=d.refs||[]; state.nextRef=d.nextRef||1;
       clampAll(); if(!fitsNow()) throw new Error('板の重なり、または材料不足があります'); dimKey=null; dimDrag=null; LBLKEY='';
+      clearLearningCue();$('learningStatus').textContent='保存した設計を復元しました。各画面は読み込んだ寸法で表示します。';
       state.sel=baseParts()[0].id; state.selKind='part';
       $('pClose').hidden=false; state.warned=false;
       goScreen('main',true); fitView();
@@ -3557,7 +3685,8 @@ $('openFile').onchange=e=>{
     }catch(err){ Object.assign(state,previous); LBLKEY=''; dimKey=null; dimDrag=null;
       $('whoIn').value=state.who; $('sceneSel').value=state.scene;
       try{goScreen(previous.screen,true);}catch(_){}
-      alert('読み込めませんでした。現在の設計は保持しました：'+err.message); } };
+      alert('読み込めませんでした。現在の設計は保持しました：'+err.message); }finally{designReading=false;} };
+  r.onerror=()=>{if(readId===designReadId){designReading=false;alert('ファイルを読み込めませんでした。現在の設計は保持しました。');}};
   r.readAsText(f); e.target.value='';
 };
 
@@ -3797,18 +3926,74 @@ function assemblySteps(ps){
   st.push('打ち終わったら、平らな台に置いて がたつきがないかを見る。');
   return st;
 }
-/* ---------- ⑤ 説明書（1枚で全部わかる） ---------- */
+/* ---------- ⑤ 説明書と部品別の釘位置図 ---------- */
 function nailDatumSheet(ps){
-  let body='<text x="12" y="28" font-size="3.3">縦板は地から。横材は左右の近い端から。単位mm。</text>',y=35;
-  for(const p of ps){
-    const rows=nailCoordinates(p,ps);if(!rows.length)continue;
-    body+=`<text x="12" y="${y}" font-size="3.4" font-weight="700">${esc(p.label)}　${isVerticalBoard(p)?'地（寸法の基準）':'下端基準'}／横：${nailDatum(p,ps).nearest?'近い左端・右端':nailDatum(p,ps).xLabel}</text>`;y+=4.5;
-    for(const r of rows){
-      body+=`<text x="16" y="${y}" font-size="3.1">${r.number}：${r.datum.xLabel} ${mm(r.x)} ／ ${r.datum.yLabel} ${mm(r.y)} → ${esc(ps.find(q=>q.id===r.nail.into).label)}</text>`;y+=4.2;
+  return ps.map(p=>{
+    const rows=nailCoordinates(p,ps);if(!rows.length)return '';
+    const xs=[...new Set(rows.map(r=>r.f[0]))].sort((a,b)=>a-b);
+    const ys=[...new Set(rows.map(r=>r.f[1]))].sort((a,b)=>a-b);
+    const datum=nailDatum(p,ps),ox=44+ys.length*3,oy=40;
+    const scale=Math.min((190-ox)/p.w,110/p.h);
+    const X=x=>ox+x*scale,Y=y=>oy+(p.h-y)*scale,bottom=Y(0);
+    const horizontal=fx=>{
+      const origin=datum.nearest?(fx<=p.w/2?0:p.w):datum.x;
+      const distance=mm(Math.abs(fx-origin));
+      const center=Math.abs(fx-p.w/2)<.01;
+      return {origin,label:center?`左右から${distance}（中心）`:`${origin===0?'左':'右'}から${distance}`};
+    };
+    let body=`<g data-nail-part="${p.id}" font-family="sans-serif">`;
+    body+=`<text x="12" y="29" font-size="3.2">釘を打ち込む面。単位mm。縦板は地から測ります。</text>`;
+    const outline=partOutline(p).map(([x,y])=>`${X(x)},${Y(y)}`).join(' '),clipId=`nail-face-${state.work}-${p.id}`;
+    body+=`<defs><clipPath id="${clipId}"><polygon points="${outline}"/></clipPath></defs>`;
+    body+=`<polygon points="${outline}" fill="#f0dfc4" stroke="#7b5c33" stroke-width=".4"/>`;
+    const hole=holeOf(p);
+    if(hole){
+      if(hole.kind==='cable')body+=`<circle cx="${X(hole.cx)}" cy="${Y(hole.cy)}" r="${hole.r*scale}" fill="white" stroke="#00913c" stroke-width=".3"/>`;
+      else body+=`<rect x="${X(hole.cx-hole.hw)}" y="${Y(hole.cy+hole.r)}" width="${hole.hw*2*scale}" height="${hole.r*2*scale}" rx="${hole.r*scale}" fill="white" stroke="#c96a00" stroke-width=".3"/>`;
     }
-    y+=2;
-  }
-  return sheetSvg(WORKS[state.work].name+'　釘位置・基準面','番号と寸法は②3Dで確認の寸法図と共通。26mmの釘を想定。',body);
+    const f=factoryEnds(ps).get(p.id);
+    if(f){for(const end of ['s','e'])if(f[end]){
+      const along=lenAxis(p)==='h',value=end==='s'?0:(along?p.h:p.w);
+      body+=along?`<line x1="${X(0)}" y1="${Y(value)}" x2="${X(p.w)}" y2="${Y(value)}" stroke="#00a344" stroke-width="1.1" clip-path="url(#${clipId})"/>`
+        :`<line x1="${X(value)}" y1="${Y(0)}" x2="${X(value)}" y2="${Y(p.h)}" stroke="#00a344" stroke-width="1.1" clip-path="url(#${clipId})"/>`;
+    }}
+    const line=(x1,y1,x2,y2)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#aa9e90" stroke-width=".2"/>`;
+    xs.forEach((fx,i)=>{
+      const {origin,label}=horizontal(fx),y=bottom+10+i*5;
+      body+=line(X(fx),bottom,X(fx),y)+line(X(origin),bottom,X(origin),y);
+      body+=line(X(origin),y,X(fx),y);
+      body+=`<text x="${(X(origin)+X(fx))/2}" y="${y-1}" text-anchor="middle" font-size="2.7" fill="#a00060">${label}</text>`;
+    });
+    ys.forEach((fy,i)=>{
+      const x=ox-8-i*5;
+      body+=line(ox,Y(fy),x,Y(fy))+line(ox,bottom,x,bottom)+line(x,bottom,x,Y(fy));
+      body+=`<text transform="translate(${x-1},${(bottom+Y(fy))/2}) rotate(-90)" text-anchor="middle" font-size="2.7" fill="#a00060">${datum.yLabel}から${mm(fy)}</text>`;
+    });
+    body+=`<text x="${X(p.w/2)}" y="${oy-4}" text-anchor="middle" font-size="3.2">幅 ${mm(p.w)}mm</text>`;
+    body+=`<text x="${X(p.w/2)}" y="${bottom+5}" text-anchor="middle" font-size="2.9">${isVerticalBoard(p)?'地（接地する下端）':'下端'}／高さ ${mm(p.h)}mm</text>`;
+    for(const r of rows){
+      const {origin,label}=horizontal(r.f[0]);
+      const explanation=`${p.label} 釘${r.number}：${label}mm、${r.datum.yLabel}から${mm(r.y)}mm`;
+      body+=`<g class="nail-trigger" data-nail-trigger="${r.number}" tabindex="0" role="button" aria-label="${esc(explanation)}" data-gx="${X(origin)}" data-gy="${Y(0)}" data-nx="${X(r.f[0])}" data-ny="${Y(r.f[1])}">`;
+      body+=`<circle cx="${X(r.f[0])}" cy="${Y(r.f[1])}" r="3.5" fill="transparent"/>`;
+      body+=`<circle data-nail-number="${r.number}" cx="${X(r.f[0])}" cy="${Y(r.f[1])}" r="1.1" fill="${r.nail.bw===60?'#0077c8':'#d9007e'}" stroke="white" stroke-width=".2"/>`;
+      body+=`<text x="${X(r.f[0])+1.5}" y="${Y(r.f[1])-1.5}" font-size="2.8">${r.number}</text></g>`;
+    }
+    const tableY=Math.max(205,bottom+18+xs.length*5);
+    body+=`<text x="12" y="${tableY-6}" font-size="3.2">番号：板の端から釘の中心まで（隣の釘から測らない）</text>`;
+    const perColumn=Math.max(1,Math.floor((280-tableY)/5));
+    const pageRows=perColumn*2;
+    const table=(items,startY)=>items.map((r,i)=>{
+      const x=i<perColumn?12:108,y=startY+(i%perColumn)*5;
+      const target=ps.find(q=>q.id===r.nail.into);
+      return `<text x="${x}" y="${y}" font-size="2.8">${r.number}：${horizontal(r.f[0]).label}／${r.datum.yLabel}${mm(r.y)} → ${esc(target.label)}</text>`;
+    }).join('');
+    body+=table(rows.slice(0,pageRows),tableY);
+    body+=`<text x="12" y="285" font-size="2.8" fill="#00913c">緑＝工場カット面。図の形・穴・釘位置は現在の設計を反映。</text></g>`;
+    let pages=sheetSvg(`${WORKS[state.work].name}　釘位置・基準面：${p.label}`,`仕上がり ${mm(p.w)}×${mm(p.h)}mm　板厚12mm／釘番号は②3Dの寸法図と共通`,body);
+    for(let i=pageRows;i<rows.length;i+=pageRows)pages+=sheetSvg(p.label+'　釘位置の続き','板の端から釘の中心まで。単位mm。',table(rows.slice(i,i+pageRows),tableY));
+    return pages;
+  }).join('');
 }
 function manualSheet(){
   const ps=parts(), W=WORKS[state.work], o=outer(), L=workload(state.work);
@@ -3940,7 +4125,9 @@ function manualSheet(){
     notes.push(`そうだんのタイプ ${state.quiz.code}／置き場所 ${SCENES[state.scene].label}`);
   if(isOriginal()) notes.push(`※あなたのオリジナル寸法です。配られた説明書の数字とはちがいます。`);
   if(state.comment) notes.push(`この寸法にした理由：${state.comment}`);
-  for(const t of notes){ for(const ln of wrapT(t,27)){
+  // 右列の幅に合わせる（全角1文字をフォントサイズ分として見積もる）。
+  const noteChars=Math.floor(mw/3.05);
+  for(const t of notes){ for(const ln of wrapT(t,noteChars)){
     body+=`<text x="${mx}" y="${by2}" font-size="3.05" fill="#4b423a">${esc(ln)}</text>`; by2+=3.9; }
     by2+=0.6; }
   body+=`<g font-size="3.4" fill="#2a2520">

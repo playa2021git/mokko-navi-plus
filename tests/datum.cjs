@@ -16,7 +16,7 @@ for(const key of 'ABCDEFGHIJKL')for(const mode of ['default','dimensions','flip'
    const f=run(`toFace(parts().find(p=>p.id==='${p.id}'),${JSON.stringify(r.nail.pos)})`);
    assert(Math.abs(r.y-f[1])<1e-9);assert.equal(r.datum.y,0);assert(Math.abs(r.x-Math.abs(f[0]-r.datum.x))<1e-9);
    if(r.datum.nearest)assert(Math.abs(r.x-Math.min(f[0],p.w-f[0]))<1e-9);
-   if(p.posture==='side'||(p.posture==='front'&&p.la==='h')){assert.equal(r.datum.yLabel,'地');assert.equal(r.datum.nearest,false);}
+   if(p.posture==='side'||(p.posture==='front'&&p.la==='h')){assert.equal(r.datum.yLabel,'地');assert.equal(r.datum.nearest,true);}
    assert.equal(r.number,rows.indexOf(r)+1);if(r.y>p.h*.7)nearTop++;if(r.y<p.h*.3)nearGround++;checked++;
   }
  }
@@ -24,4 +24,4 @@ for(const key of 'ABCDEFGHIJKL')for(const mode of ['default','dimensions','flip'
 assert(nearTop>0&&nearGround>0);assert(!s.includes('const fromBottom'));assert(!s.includes('const fromLeft'));
 assert(s.includes('dimV(Y(0),Y(fy)'));assert(s.includes('dimH(X(origin),X(fx)'));
 assert(s.includes('地（寸法の基準）'));assert(s.includes('nailDatumSheet(ps)'));
-console.log(`PASS: ${checked} nails A–L, default/dimensions/flips/stock positioning/corners/holes; ground and designated horizontal datum; no nearest top edge`);
+console.log(`PASS: ${checked} nails A–L, default/dimensions/flips/stock positioning/corners/holes; ground and nearest horizontal board end; no nearest top edge`);

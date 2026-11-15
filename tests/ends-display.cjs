@@ -16,7 +16,7 @@ const output=process.env.AUDIT_OUTPUT||path.join(require('os').tmpdir(),'mokko-e
    assert.equal(info.nails>0,nails);assert.deepEqual(await p.evaluate(()=>({nails:JSON.stringify(nailSpots(parts())),nest:JSON.stringify(nest(parts())),ps:JSON.stringify(parts())})),original);
   }
   await p.evaluate(()=>{state.showEnds=true;state.showNails=true;refresh();});const opacity=await p.evaluate(()=>inspectModes().woods.map(m=>m.opacity));await p.waitForTimeout(200);assert.deepEqual(await p.evaluate(()=>inspectModes().woods.map(m=>m.opacity)),opacity);
-  await p.evaluate(()=>{state.showEnds=false;refresh();});const pulse=await p.evaluate(()=>inspectModes().woods.map(m=>m.opacity));await p.waitForTimeout(200);assert.notDeepEqual(await p.evaluate(()=>inspectModes().woods.map(m=>m.opacity)),pulse);
+  await p.evaluate(()=>{state.showEnds=false;refresh();});const pulse=await p.evaluate(()=>inspectModes().woods.map(m=>m.opacity));await p.waitForTimeout(200);assert.deepEqual(await p.evaluate(()=>inspectModes().woods.map(m=>m.opacity)),pulse,'nail mode keeps a steady wood opacity');
   for(const change of ['flip','nest','dims']){
    await p.evaluate(mode=>{if(mode==='flip')for(const q of parts())state.flip[q.id]=true;if(mode==='nest')for(const q of parts())state.nestX[q.id]=5;if(mode==='dims')trySetDim('W',dimsOf().W-2,true);state.showEnds=true;refresh();},change);
    assert((await p.evaluate(()=>inspectModes().ends)).every(m=>!m.depth));

@@ -24,7 +24,7 @@ const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
     assert(stl.suggestedFilename().endsWith('_5分の1.stl'));assert.equal(hash(fs.readFileSync(await stl.path())),hash(Buffer.from(expected)),screen+' same STL');
     await page.screenshot({path:path.join(output,`quality-${channel}-${width}-${screen}.png`),fullPage:true});
     await page.emulateMedia({media:'print'});assert.equal(await page.locator('#save').isVisible(),false);await page.emulateMedia({media:'screen'});
-    const chooser=page.waitForEvent('filechooser');await page.click('#openBtn');await (await chooser).setFiles({name:'same-design.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(saved))});await page.waitForFunction(()=>state.screen==='main');assert.equal(await page.evaluate(()=>dimsOf().W),282);
+    const chooser=page.waitForEvent('filechooser');await page.click('#openBtn');await (await chooser).setFiles({name:'same-design.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(saved))});await page.waitForFunction(()=>!designReading&&state.screen==='main');assert.equal(await page.evaluate(()=>dimsOf().W),282);
     report.push({channel,width,height,screen,save:true,stl:true,open:true,printButtonsHidden:true});
    }
   }
@@ -35,7 +35,7 @@ const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
   const nativeWarning=page.waitForEvent('dialog');const reloading=page.reload().catch(()=>null);const warning=await nativeWarning;assert.equal(warning.type(),'beforeunload');await warning.dismiss();await reloading;assert.equal(await page.evaluate(()=>state.work),'L');
   await page.evaluate(()=>chooseWork('B'));const saveBefore=page.waitForEvent('download');await page.click('#mYes');const saved=await saveBefore;const file=await saved.path();assert.equal(await page.evaluate(()=>state.work),'B');
   const parsed=JSON.parse(fs.readFileSync(file,'utf8'));assert.equal(parsed.work,'L');assert.equal(parsed.dims.W,248);
-  await page.locator('#openFile').setInputFiles({name:'saved.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(parsed))});await page.waitForFunction(()=>state.work==='L');assert.equal(await page.evaluate(()=>dimsOf().W),248);assert.equal(await page.evaluate(()=>hasUnsavedChanges()),false);
+  await page.locator('#openFile').setInputFiles({name:'saved.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(parsed))});await page.waitForFunction(()=>!designReading&&state.work==='L');assert.equal(await page.evaluate(()=>dimsOf().W),248);assert.equal(await page.evaluate(()=>hasUnsavedChanges()),false);
   await page.evaluate(()=>{trySetDim('W',246,true);chooseWork('A');});await page.click('#discardDesign');assert.equal(await page.evaluate(()=>state.work),'A');
   const acc=page.locator('.acc>h2').first();const before=await acc.getAttribute('aria-expanded');await acc.focus();await page.keyboard.press('Space');assert.notEqual(await acc.getAttribute('aria-expanded'),before);await page.keyboard.press('Enter');assert.equal(await acc.getAttribute('aria-expanded'),before);
   await page.evaluate(()=>{addRef('text');addRef('bunko');buildRefs();});assert(await page.locator('#refAdd').textContent().then(t=>t.includes('現在')&&t.includes('単独最大')));

@@ -19,8 +19,12 @@ const output=process.env.AUDIT_OUTPUT||path.join(require('os').tmpdir(),'mokko-v
     await page.evaluate(k=>goScreen(k,true),screen);
     const content=await page.locator(screen==='draw'?'#dfoot':screen==='view'?'#vBody':'#sBody').textContent();assert(!/NaN|undefined/.test(content));
     if(screen!=='draw'){
-     const overflow=await page.locator(screen==='view'?'#vBody svg.a4':'#sBody svg.a4').evaluateAll(es=>es.flatMap(svg=>[...svg.querySelectorAll('text')].filter(t=>{const b=t.getBBox();return b.x<-.5||b.y<-.5||b.x+b.width>211||b.y+b.height>298;}).map(t=>t.textContent)));
+     const overflow=await page.locator(screen==='view'?'#vBody svg.a4':'#sBody svg.a4').evaluateAll(es=>es.flatMap(svg=>[...svg.querySelectorAll('text')].filter(t=>{const b=t.getBBox(),m=svg.getScreenCTM().inverse().multiply(t.getScreenCTM());const corners=[[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>new DOMPoint(x,y).matrixTransform(m));return corners.some(p=>p.x<-.5||p.y<-.5||p.x>211||p.y>298);}).map(t=>t.textContent)));
      if(overflow.length)console.log(key,screen,overflow);assert.deepEqual(overflow,[],key+' '+screen+' overflow');
+     if(screen==='sheet'){
+      const outsideNotes=await page.locator('#sBody svg.a4').first().locator('text[fill="#4b423a"]').evaluateAll(es=>es.filter(t=>{const b=t.getBBox();return b.x<132-.5||b.x+b.width>198+.5;}).map(t=>t.textContent));
+      assert.deepEqual(outsideNotes,[],key+' manual notes must fit the right column');
+     }
     }
     assert.equal(await page.evaluate(()=>JSON.stringify(parts().map(p=>[p.id,p.w,p.h,p.pos]))),snapshot.geom,key+' geometry on '+screen);
    }
