@@ -975,6 +975,29 @@ function moveStockPart(id,boardId,x=0,swapId=null){
   state.nestX=Object.fromEntries(next.boards.flatMap(b=>b.placed.map(q=>[q.id,q.x])));
   state.warned=false;return true;
 }
+/* 地面に接する側板だけでなく、棚板に立つ仕切板や横の接合端も対象にする。 */
+function supportedFlipCandidate(ps,id){
+  const p=ps.find(p=>p.id===id),group=nestRange(ps,id);
+  if(!p||!group||group.q.process)return null;
+  const f=factoryEnds(ps).get(id);if(!f||f.s===f.e)return null;
+  const {ax,s}=endAxis(p),sign=f.s?s:-s;
+  if(supportedEnd(p,sign,ps)||!supportedEnd(p,-sign,ps))return null;
+  const floor=ax===1&&sign>0&&Math.abs(bbox(p).min[1])<.6;
+  return {...group,from:AXNAME[ax][sign>0?1:0],to:AXNAME[ax][sign>0?0:1],floor,
+    label:floor?'接地側に反転':AXNAME[ax][sign>0?0:1]+'の接合側に反転'};
+}
+function flipToSupportedEnd(id){
+  const target=supportedFlipCandidate(parts(),id);if(!target)return false;
+  state.flip[target.q.id]=!stockFlip(target.q);state.warned=false;return true;
+}
+function openEndControls(){
+  const acc=$('endBox').closest('.acc');acc.classList.add('open');acc.querySelector('h2').setAttribute('aria-expanded','true');
+}
+function repairFactoryEnd(id){
+  const target=supportedFlipCandidate(parts(),id);if(!target||!flipToSupportedEnd(id))return;
+  focusParts([id],`製材所の端を${target.to}の接合・接地側へ変更しました。家具の形や角加工は変わりません。`);
+  openEndControls();
+}
 function floorFlipCandidate(ps,id){
   const p=ps.find(p=>p.id===id),group=nestRange(ps,id);
   if(!p||!group||group.q.process||!isVerticalBoard(p)||Math.abs(bbox(p).min[1])>.6)return null;
@@ -1395,6 +1418,7 @@ function focusParts(ids,message){
   const ps=parts();ids=[...new Set(ids)].filter(id=>ps.some(p=>p.id===id));if(!ids.length)return;
   state.sel=ids[0];state.selKind='part';learningIds=new Set(ids);
   refresh();
+  if(supportedFlipCandidate(parts(),state.sel))openEndControls();
   $('learningStatus').textContent=message||ps.filter(p=>ids.includes(p.id)).map(p=>p.label).join('・')+'：一覧・3D・材料取り図で同じ板です。';
   $('parts').querySelectorAll('[data-part-id]').forEach(b=>{if(learningIds.has(b.dataset.partId))b.classList.add('learn-cue');});
   if(!reducedMotion.matches)highlightModel(ids);
@@ -2161,7 +2185,8 @@ function checkAll(ps,leftOver){
     if(!rp.length) msgs.push({lv:'warn',
       t:'まだ製材所の端を使っていません。材料取り図で部品を材料の端までドラッグしてみましょう。'});
     for(const r of waste.slice(0,4)){
-      msgs.push({lv:'warn',ids:[r.id],t:`${r.label}のきれいな面が${r.where}側で、何とも接していません。もったいない使い方です。`});
+      const target=supportedFlipCandidate(ps,r.id);
+      msgs.push({lv:'warn',ids:[r.id],flipId:target?r.id:null,flipLabel:target?.label,t:`${r.label}のきれいな面が${r.where}側で、何とも接していません。もったいない使い方です。`});
       bad.add(r.id);
     }
     const good=rp.filter(r=>r.ok||r.fair);
@@ -2419,11 +2444,11 @@ function drawNest(){
         ? `／ <span style="color:#00a344">緑＝製材所が切った端</span>・左右で位置調整、A/Bの行をまたいで移動・交換できます`
         : `／ 左右で位置調整・A/Bの行をまたいで移動・部品の上で交換（切りしろ ${KERF}mm）`))
     + (boards.some(b=>b.placed.length&&b.placed.at(-1).x+b.placed.at(-1).len<b.w-.5)?'<br>材料の右端にも、製材所で切られた面があります。部品を移動して活用できないか考えてみよう。接合や接地に適した場所で使えるかを考え、使わない選択もできます。':'')
-    + ps.filter(p=>floorFlipCandidate(ps,p.id)).map(p=>'<br><span style="color:#b0463c">'+esc(p.label)+'：工場カット面が天を向いています。</span> <button data-floor-flip="'+p.id+'">接地側に反転</button>').join('')
+    + ps.map(p=>{const target=supportedFlipCandidate(ps,p.id);return target?'<br><span style="color:#b0463c">'+esc(p.label)+'：製材所の端が'+target.from+'側です。</span> <button data-end-flip="'+p.id+'"'+(target.floor?' data-floor-flip="'+p.id+'"':'')+'>'+target.label+'</button>':'';}).join('')
     + (nestMessage?'<br><b role="status">'+esc(nestMessage)+'</b>':'')
     + (hn.length?'<br>'+hn.join('　／　')+'　※穴も左右にドラッグできます':'')
     + (WORKS[state.work].original?'<br>'+esc(processNotes(ps)[0]):'');
-  $('nestNote').querySelectorAll('[data-floor-flip]').forEach(b=>b.onclick=()=>{if(flipToFloor(b.dataset.floorFlip))focusParts([b.dataset.floorFlip],'工場カット面を接地側へ変更しました。完成形の寸法は変わりません。');});
+  $('nestNote').querySelectorAll('[data-end-flip]').forEach(b=>b.onclick=()=>repairFactoryEnd(b.dataset.endFlip));
   return left;
 }
 
@@ -2875,7 +2900,7 @@ function buildParts(ps){
     const r2=endReport(ps).find(r=>r.id===sel.id);
     eb.innerHTML=`<p class="note">いま きれいな面は <b style="color:#00a344">${r2?r2.where:''}側</b>`
       +`（${r2?r2.why:''}）</p>`
-      +`<div class="row"><button id="flipBtn">ひっくり返す</button></div>`
+      +`<div class="row"><button id="flipBtn">${supportedFlipCandidate(ps,sel.id)?.label||'材料の端を反対側にする'}</button></div>`
       +(r2&&!r2.ok&&!r2.fair?'<p class="note" style="color:#b0463c">何とも接していません。'
         +'置く面に接する側や、他の板と突き合わせる側に回すと精度が上がります。</p>':'');
     $('flipBtn').onclick=()=>{ const group=nestRange(ps,sel.id),id=group?group.q.id:sel.id;
@@ -3381,8 +3406,9 @@ function refresh(){
   $('endBtn').className =state.showEnds?'on':'';
   drawDim(); showHint(); if(!$('draw').hidden) drawSheet();
   $('msgs').innerHTML=msgs.map((m,i)=>
-    `<div class="msg ${m.lv}"><span class="bd">${m.lv==='ok'?'✓':'!'}</span><span>${m.t}${m.ids?.length?` <button data-find-issue="${i}">場所を確認</button>`:''}</span></div>`).join('');
+    `<div class="msg ${m.lv}"><span class="bd">${m.lv==='ok'?'✓':'!'}</span><span>${m.t}${m.flipId?` <button data-end-repair="${m.flipId}">${m.flipLabel}</button>`:''}${m.ids?.length?` <button data-find-issue="${i}">場所を確認</button>`:''}</span></div>`).join('');
   $('msgs').querySelectorAll('[data-find-issue]').forEach(b=>b.onclick=()=>focusParts(msgs[+b.dataset.findIssue].ids,'確認が必要な板を示しています。材料取りと寸法を確認しましょう。'));
+  $('msgs').querySelectorAll('[data-end-repair]').forEach(b=>b.onclick=()=>repairFactoryEnd(b.dataset.endRepair));
   refreshDesignDocuments();
 }
 
