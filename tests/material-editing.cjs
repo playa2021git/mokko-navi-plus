@@ -79,7 +79,7 @@ fs.mkdirSync(output,{recursive:true});
   assert.equal(await page.evaluate(()=>designFingerprint()),beforeInvalid);
   assert.match(await page.locator('#nestNote').innerText(),/交換できません/);
   await page.evaluate(()=>{
-   state.hole={id:'bo',x:130};state.corners.bo=[round_(5),none,none,none];
+   state.hole={id:'bo',x:130};state.corners.L=[none,none,none,round_(5)];
    state.comment='材料の端を接地に使うため高さを調整しました。';state.who='検証';refresh();
   });
   await roundtrip('A');
@@ -101,8 +101,9 @@ fs.mkdirSync(output,{recursive:true});
     try{validateDesign(d);return false;}catch(e){}
    }return validateDesign({version:10,work:'A'}).work==='A';
   }));
+  // Keep the resized fixtures outside the corner cuts; invalid contacts are covered by release-qa.cjs.
   for(const key of 'BCDEFGHIJKL'){
-   await page.evaluate(k=>{chooseWork(k,true);for(const [name,delta] of [['W',40],['H',20]]){const t=WORKS[k].dims.find(t=>t.k===name);if(t)trySetDim(name,Math.max(t.min,dimsOf()[name]-delta),true);}},key);
+   await page.evaluate(k=>{chooseWork(k,true);if(k==='I')trySetDim('sh',125,true);for(const [name,delta] of [['W',40],['H',k==='G'?1:20]]){const t=WORKS[k].dims.find(t=>t.k===name);if(t)trySetDim(name,Math.max(t.min,dimsOf()[name]-delta),true);}},key);
    const before=await snapshot();
    const moved=await page.evaluate(()=>{
     const boards=nest(parts()).boards,a=boards[0],b=boards[1];

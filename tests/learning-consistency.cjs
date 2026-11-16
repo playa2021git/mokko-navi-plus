@@ -20,10 +20,10 @@ fs.mkdirSync(output,{recursive:true});
     const attempted=await slider.evaluate((e,v)=>{e.value=v;const attempted=+e.value;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));return attempted;},requested);
     const model=await page.evaluate(()=>{
      const ps=parts(),dim=dimsOf(),box=ps.map(bbox);
-     return {dim,geometry:JSON.stringify(ps),table:[...new Set(ps.map(p=>`12×${p.bw}×${Math.round(p.la==='h'?p.h:p.w)}`))].sort(),
+     return {dim,geometry:JSON.stringify(ps),table:[...new Set(ps.map(p=>`12×${p.bw}×${mm(p.la==='h'?p.h:p.w)}`))].sort(),
       sizes:ps.map(p=>({id:p.id,w:p.w,h:p.h,nails:nailCoordinates(p).map(r=>({number:r.number,x:r.x,y:r.y}))})),
       bounds:[0,2,1].map(i=>Math.max(...box.map(b=>b.max[i]))-Math.min(...box.map(b=>b.min[i]))),
-      outer:outer(),valid:fitsNow()&&!nailSpots(ps,true).some(n=>!n.valid),design:designFingerprint()};
+      outer:outer(),valid:fitsNow()&&!nailSpots(ps,true).some(n=>!n.valid)&&!constructionIssues(ps).length,design:designFingerprint()};
     });
     assert(model.dim[dim.k]===attempted||model.dim[dim.k]===dim.initial,key+' input is applied or rejected atomically');
     if(!model.valid){
@@ -61,7 +61,7 @@ fs.mkdirSync(output,{recursive:true});
     report.push({key,dimension:dim.k,attempted,actual:model.dim[dim.k],outcome:'current-values-verified'});
    }
    // Save a combined width/height change and compare all document content after reopening.
-   await page.evaluate(k=>{chooseWork(k,true);for(const t of WORKS[k].dims){if(['W','H'].includes(t.k))trySetDim(t.k,Math.max(t.min,dimsOf()[t.k]-t.step*3),true);}state.comment='置き場所に合わせて幅と高さを変更しました。';goScreen('sheet',true);},key);
+   await page.evaluate(k=>{chooseWork(k,true);if(k==='I')trySetDim('sh',145,true);for(const t of WORKS[k].dims){if(['W','H'].includes(t.k))trySetDim(t.k,Math.max(t.min,dimsOf()[t.k]-(t.k==='H'?1:t.step*3)),true);}state.comment='置き場所に合わせて幅と高さを変更しました。';goScreen('sheet',true);},key);
    const savedManual=await page.locator('#sBody').innerHTML(),savedGeometry=await page.evaluate(()=>JSON.stringify(parts()));
    const downloadPromise=page.waitForEvent('download');await page.locator('#save').click();const download=await downloadPromise;
    const file=path.join(output,key+'.json');await download.saveAs(file);

@@ -471,7 +471,7 @@ body.dim main{height:calc(100vh - 42px)}
     <span class="grow"></span>
     <span class="steps" id="sSteps"></span>
     <label style="font-size:12px">名前
-      <input id="whoIn" type="text" placeholder="1年1組1番 ○○" style="width:150px"></label>
+      <input id="whoIn" type="text" maxlength="40" placeholder="1年1組1番 ○○" style="width:150px"></label>
     <button id="sPrint">印刷する</button></div>
   <div class="measure-readout" id="measureReadout" role="status" aria-live="polite">釘位置図の釘番号を選ぶと、板の端からの測り方を確認できます。</div>
   <div class="pbody" id="sBody"></div>
@@ -643,7 +643,7 @@ F:{ name:'作品例F', manual:2, D:162,
 
 G:{ name:'作品例G', manual:2, D:174,
   desc:'前板と取っ手が付く持ち運び箱。取っ手だけは細い板を使う。',
-  dims:[{k:'W',label:'外はば',min:200,max:520,step:2,def:280},
+  dims:[{k:'W',label:'本体の外はば',min:200,max:520,step:2,def:280},
         {k:'H',label:'高さ',min:162,max:400,step:5,def:190},
         {k:'dv',label:'仕切板の位置',min:-160,max:160,step:5,def:0,
          lim:d=>[-(d.W-2*T)/2+40,(d.W-2*T)/2-40]}],
@@ -805,8 +805,11 @@ function isOriginal(key=state.work){
   const d=dimsOf(key), f=defDims(key);
   return WORKS[key].dims.some(t=>d[t.k]!==f[t.k]);
 }
-function outer(key=state.work){ const d=dimsOf(key);
-  return {W:Math.round(d.W)+(key==='L'?100-T:0), D:WORKS[key].D, H:Math.round(d.H)}; }
+function outer(key=state.work,initial=false){
+  const ps=key===state.work&&!initial?parts():WORKS[key].make(defDims(key)),bs=ps.map(bbox);
+  const size=i=>Number(mm(Math.max(...bs.map(b=>b.max[i]))-Math.min(...bs.map(b=>b.min[i]))));
+  return {W:size(0),D:size(2),H:size(1)};
+}
 function baseParts(key=state.work){
   const ps=WORKS[key].make(key===state.work?dimsOf(key):defDims(key));
   /* 手穴をくりぬくと、後付けの取っ手（作品例G）は要らなくなる */
@@ -874,7 +877,7 @@ function nest(ps,useLayout=true){
   const seen=new Set(), items=[];
   for(const p of ps){
     if(p.nestKey){ if(seen.has(p.nestKey)) continue; seen.add(p.nestKey); }
-    items.push({id:p.id,label:p.nestLabel||p.label||p.name,len:p.nestLen||Math.round(cutLen(p)),bw:p.nestBw||p.bw,
+    items.push({id:p.id,label:p.nestLabel||p.label||p.name,len:p.nestLen||cutLen(p),bw:p.nestBw||p.bw,
       process:p.process,members:p.nestKey?ps.filter(q=>q.nestKey===p.nestKey).map(q=>q.id):[p.id]});
   }
   items.sort((a,b)=>b.len-a.len);
@@ -936,7 +939,7 @@ function nest(ps,useLayout=true){
     bd.gaps=[]; let cur=0;
     for(const q of bd.placed){ if(q.x-cur>0.5) bd.gaps.push([cur,q.x]); cur=q.x+q.len; }
     if(bd.w-cur>0.5) bd.gaps.push([cur,bd.w]);
-    bd.rest=Math.round(bd.gaps.reduce((t,g)=>t+(g[1]-g[0]),0));
+    bd.rest=Number(mm(bd.gaps.reduce((t,g)=>t+(g[1]-g[0]),0)));
   }
   return {boards,left};
 }
@@ -1116,7 +1119,48 @@ function nailRow(span){
 }
 // Model matches the 26 mm nail drawn in 3D; this is not a strength calculation.
 const NAIL_LENGTH=26, NAIL_RADIUS=1.05;
-const mm=v=>String(Number(v.toFixed(3)));
+const mm=v=>String(Number(v.toPrecision(15)));
+/* 接合面全体に木があるか。釘の点だけが残っていても、切り欠きに棚がかかれば止める。 */
+function jointSupported(p,jt){
+  const points=[];
+  for(const u of [0,0.5,1])for(const v of [0,0.5,1]){
+    const q=[0,0,0];q[jt.k]=jt.plane;
+    q[jt.ax[0]]=jt.lo[0]+(jt.hi[0]-jt.lo[0])*u;
+    q[jt.ax[1]]=jt.lo[1]+(jt.hi[1]-jt.lo[1])*v;
+    points.push(q);
+  }
+  // Move a microscopic distance into the rectangle, avoiding boundary round-off.
+  const faces=points.map(q=>toFace(p,q));
+  const lo=[0,1].map(i=>Math.min(...faces.map(f=>f[i]))),hi=[0,1].map(i=>Math.max(...faces.map(f=>f[i])));
+  const center=points[4];
+  if(!points.every(q=>pointOnWood(p,q.map((v,i)=>v+(center[i]-v)*1e-7))))return false;
+  const h=holeOf(p);
+  if(h){
+    const reach=h.kind==='hand'?h.hw-h.r:0;
+    const dx=Math.max(0,lo[0]-(h.cx+reach),(h.cx-reach)-hi[0]);
+    const dy=Math.max(0,lo[1]-h.cy,h.cy-hi[1]);
+    if(Math.hypot(dx,dy)<h.r-1e-6)return false;
+  }
+  return true;
+}
+function constructionIssues(ps=parts()){
+  const actual=joints(ps),nominal=ps.map(p=>({...p,pos:p.pos.map((v,i)=>v-(state.off[p.id]?.[i]||0))}));
+  const pair=j=>[ps[j.a].id,ps[j.b].id].sort().join('|');
+  const found=new Map(actual.map(j=>[pair(j),j])),issues=[];
+  for(const expected of joints(nominal)){
+    const a=ps[expected.a],b=ps[expected.b],jt=found.get(pair(expected));
+    if(!jt){issues.push({ids:[a.id,b.id],t:`${a.label||a.name}と${b.label||b.name}の接合が外れています。「位置を戻す」などで板を接する位置に戻してください。`});continue;}
+    const ab=bbox(a),bb=bbox(b),gap=Math.abs(jt.dir>0?ab.max[jt.k]-bb.min[jt.k]:ab.min[jt.k]-bb.max[jt.k]);
+    if(gap>1e-6)issues.push({ids:[a.id,b.id],t:`${a.label||a.name}と${b.label||b.name}の間に${mm(gap)}mmの隙間があります。板を接する位置に戻してください。`});
+    const area=j=>(j.hi[0]-j.lo[0])*(j.hi[1]-j.lo[1]);
+    if(area(jt)<area(expected)-1e-5)issues.push({ids:[a.id,b.id],t:`${a.label||a.name}と${b.label||b.name}の接合面がずれています。板の位置を戻してください。`});
+  }
+  for(const jt of actual){
+    const a=ps[jt.a],b=ps[jt.b];
+    if(!jointSupported(a,jt)||!jointSupported(b,jt))issues.push({ids:[a.id,b.id],t:`${a.label||a.name}と${b.label||b.name}の接合面が角加工・穴・切り欠きにかかっています。棚板の高さや角の加工を見直してください。`});
+  }
+  return issues;
+}
 function overlappingParts(ps){
   const out=[];
   for(let i=0;i<ps.length;i++) for(let j=i+1;j<ps.length;j++)
@@ -1356,8 +1400,8 @@ function focusParts(ids,message){
 reducedMotion.addEventListener('change',()=>{clearLearningCue();drawNest();markDirty();});
 function refreshDesignDocuments(){
   if($('view').hidden&&$('sheet').hidden)return;
-  const ps=parts(),invalid=nest(ps).left.length||overlappingParts(ps).length||nailSpots(ps,true).some(n=>!n.valid);
-  const blocked='<p role="alert">現在の設計は材料不足・板の重なり・釘の進路を確認する必要があります。②3Dで修正してください。</p>';
+  const ps=parts(),invalid=nest(ps).left.length||overlappingParts(ps).length||nailSpots(ps,true).some(n=>!n.valid)||constructionIssues(ps).length;
+  const blocked='<p role="alert">現在の設計は材料不足・板の重なり・接合面・釘の進路を確認する必要があります。②3Dで修正してください。</p>';
   if(!$('view').hidden)$('vBody').innerHTML=invalid?blocked:drawViewSheet();
   if(!$('sheet').hidden){$('sBody').innerHTML=invalid?blocked:manualSheet();$('measureReadout').textContent='釘位置図の釘番号を選ぶと、板の端からの測り方を確認できます。';}
 }
@@ -2077,6 +2121,7 @@ function checkAll(ps,leftOver){
     invalid.forEach(n=>{bad.add(n.driver);bad.add(n.into);});
     msgs.push({lv:'bad',ids:[...new Set(invalid.flatMap(n=>[n.driver,n.into]))],t:'角の加工または穴が釘の位置・進路（26mmの釘を想定）と重なっています。加工を見直してください（該当する釘は表示していません）。'});
   }
+  for(const issue of constructionIssues(ps)){issue.ids.forEach(id=>bad.add(id));msgs.push({lv:'bad',...issue});}
   /* 段差（自分で動かした板だけ見る。同じ原因は1回だけ） */
   const AX=['左右','上下','前後'],seen=new Set();
   for(let i=0;i<boxes.length;i++) for(let j=i+1;j<boxes.length;j++){
@@ -2087,8 +2132,8 @@ function checkAll(ps,leftOver){
         if(d>0.5&&d<T-0.5) hit=d; }
       if(!hit) continue;
       bad.add(boxes[i].id); bad.add(boxes[j].id);
-      const key=k+'|'+hit.toFixed(1); if(seen.has(key)) continue; seen.add(key);
-      msgs.push({lv:'warn',t:`${nm(boxes[i].id)}と${nm(boxes[j].id)}の${AX[k]}の端が ${hit.toFixed(0)}mm ずれています。段差ができます。`});
+      const key=k+'|'+mm(hit); if(seen.has(key)) continue; seen.add(key);
+      msgs.push({lv:'warn',t:`${nm(boxes[i].id)}と${nm(boxes[j].id)}の${AX[k]}の端が ${mm(hit)}mm ずれています。段差ができます。`});
     }
   }
   /* 釘の打ち代 */
@@ -2126,17 +2171,21 @@ function checkAll(ps,leftOver){
     const h=Math.max(...ps.map(p=>bbox(p).max[1]));
     const w=Math.max(...ps.map(p=>bbox(p).max[0]))-Math.min(...ps.map(p=>bbox(p).min[0]));
     if(!sc.shelf) msgs.push({lv:'ok',
-      t:`高さ${Math.round(h)}mm・はば${Math.round(w)}mm。${sc.label}なので高さの制限はありません。`});
+      t:`高さ${mm(h)}mm・はば${mm(w)}mm。${sc.label}なので高さの制限はありません。`});
     else if(h>sc.shelf) msgs.push({lv:'warn',
-      t:`高さ${Math.round(h)}mmは、${sc.shelfName}の下（${sc.shelf}mm）には入りません。`
+      t:`高さ${mm(h)}mmは、${sc.shelfName}の下（${sc.shelf}mm）には入りません。`
        +'はしに置くことになります。'});
     else msgs.push({lv:'ok',
-      t:`高さ${Math.round(h)}mm・はば${Math.round(w)}mm。`
+      t:`高さ${mm(h)}mm・はば${mm(w)}mm。`
        +`${sc.shelfName}の下（${sc.shelf}mm）に入ります。`});
   }
   if(state.work==='L')msgs.push({lv:'warn',t:'近藤オリジナルL：耐荷重は未確認です。釘・ボンドを含む実物試験前に80kg対応とは判断できません。'});
   if(!msgs.length) msgs.push({lv:'ok',t:'問題はありません。'});
   return {msgs,bad};
+}
+
+function blockingIssues(ps=parts()){
+  return checkAll(ps,nest(ps).left).msgs.filter(m=>m.lv==='bad');
 }
 
 /* =========================================================
@@ -2242,8 +2291,8 @@ function nestHole(ps,q){
   const p=ps.find(x=>x.id===q.id); if(!p) return null;
   const hl=holeOf(p); if(!hl) return null;
   const along=(lenAxis(p)==='h')?hl.cy:hl.cx;
-  return {kind:hl.kind, along:Math.round(along),
-          mat:Math.round(q.x+(stockFlip(q)?q.len-along:along))};
+  return {kind:hl.kind, along:along,
+          mat:q.x+(stockFlip(q)?q.len-along:along)};
 }
 /* 円（hs=0）またはトラック形の道を作る。hs＝長いほうの半分、vert＝たてに寝かせる */
 function drawSlot(g,cx,cy,hs,r,vert){
@@ -2323,8 +2372,8 @@ function drawNest(){
       g.strokeStyle='#6b5233'; g.lineWidth=1; g.strokeRect(x+.5,oy+.5,pw,bh);
       if((q.members||[q.id]).some(id=>learningIds.has(id))){g.save();g.strokeStyle='#2871a8';g.lineWidth=3;g.strokeRect(x+1.5,oy+1.5,pw-3,bh-3);g.restore();}
       if(pw>46&&bh>13){ g.fillStyle=sel?'#fff':'#3f3225';
-        g.fillText(`${q.label}`,x+3,oy+bh/2-1); g.fillText(`${q.len}`,x+3,oy+bh/2+10); }
-      else if(pw>26){ g.fillStyle=sel?'#fff':'#3f3225'; g.fillText(`${q.len}`,x+2,oy+bh/2+4); }
+        g.fillText(`${q.label}`,x+3,oy+bh/2-1); g.fillText(`${mm(q.len)}`,x+3,oy+bh/2+10); }
+      else if(pw>26){ g.fillStyle=sel?'#fff':'#3f3225'; g.fillText(`${mm(q.len)}`,x+2,oy+bh/2+4); }
       /* のこぎりの通り道（材料の端でない側にできる） */
       g.fillStyle='rgba(176,70,60,.30)';
       if(!q.endS) g.fillRect(x-KERF*sc,oy,KERF*sc,bh);
@@ -2355,7 +2404,7 @@ function drawNest(){
     g.fillStyle='#7b7166'; g.save(); g.textAlign='center';
     for(const [a1,a2] of b.gaps){
       const gx=ox+a1*sc, gw=(a2-a1)*sc;
-      if(gw>34){ g.fillText('余り',gx+gw/2,oy+bh/2-1); g.fillText(`${Math.round(a2-a1)}`,gx+gw/2,oy+bh/2+10); }
+      if(gw>34){ g.fillText('余り',gx+gw/2,oy+bh/2-1); g.fillText(`${mm(a2-a1)}`,gx+gw/2,oy+bh/2+10); }
     }
     g.restore();
     oy+=bh+gapMM*sc;
@@ -2452,7 +2501,7 @@ function drawDim(){
   const rows=new Map();                       // 横並び（同じ高さ）
   const cols=new Map();                       // 縦並び（同じ横位置）
   for(const n of mine){
-    const ky='y'+n.f[1].toFixed(1), kx='x'+n.f[0].toFixed(1);
+    const ky='y'+mm(n.f[1]), kx='x'+mm(n.f[0]);
     (rows.get(ky)||rows.set(ky,[]).get(ky)).push(n);
     (cols.get(kx)||cols.set(kx,[]).get(kx)).push(n);
   }
@@ -2552,8 +2601,8 @@ function drawDim(){
   /* 穴の寸法（板の端から中心まで） */
   if(hl){
     const col=hl.kind==='cable'?'#00913c':'#c96a00';
-    dimH(X(0),X(hl.cx), Y(hl.cy)+(hl.kind==='cable'?-HOLE_R*s-16:-hl.r*s-16), `${Math.round(hl.cx)}`, col);
-    dimV(Y(0),Y(hl.cy), X(hl.cx)+(hl.kind==='cable'?HOLE_R*s+18:hl.hw*s+18), `${Math.round(hl.cy)}`, col);
+    dimH(X(0),X(hl.cx), Y(hl.cy)+(hl.kind==='cable'?-HOLE_R*s-16:-hl.r*s-16), `${mm(hl.cx)}`, col);
+    dimV(Y(0),Y(hl.cy), X(hl.cx)+(hl.kind==='cable'?HOLE_R*s+18:hl.hw*s+18), `${mm(hl.cy)}`, col);
     g.save(); g.textAlign='center'; g.fillStyle=col; g.font='12px system-ui';
     g.fillText(hl.kind==='cable'?`φ${HOLE_D} ケーブルの穴`:`${HAND_W}×${HAND_H} 手を入れる穴（糸のこ）`,
       X(hl.cx), Y(hl.cy)+(hl.kind==='cable'?HOLE_R*s+16:hl.r*s+16));
@@ -2568,7 +2617,7 @@ function drawDim(){
     if(c.type==='none') return;
     const lx=X(cpos[i][0])+(i===1||i===2?-6:6), ly=Y(cpos[i][1])+(i>=2?-14:14);
     g.fillStyle='#8a5a2b'; g.textAlign=(i===1||i===2)?'right':'left';
-    const cs=Math.round(Math.min(c.size,Math.min(p.w,p.h)/2));
+    const cs=mm(Math.min(c.size,Math.min(p.w,p.h)/2));
     g.fillText(c.type==='round'?`R${cs}`:`${cs}の斜め`, lx, ly);
   });
 
@@ -2577,7 +2626,7 @@ function drawDim(){
   g.fillStyle='#2a2520'; g.font='600 15px system-ui';
   g.fillText(`${p.label}`, 12, 96);
   g.font='11.5px system-ui'; g.fillStyle='#7b7166';
-  g.fillText(`仕上がり 12 × ${p.bw} × ${Math.round(cutLen(p))} mm`, 12, 112);
+  g.fillText(`仕上がり 12 × ${p.bw} × ${mm(cutLen(p))} mm`, 12, 112);
   g.textAlign='right';
   g.fillText(mine.length?'数字は板の端からの距離（mm）':'この板には釘を打ちません（相手の板から打たれます）', W-12, 58);
   /* 色の見方 */
@@ -2660,7 +2709,7 @@ function drawSheet(){
       g.font=`600 ${12.5*F}px system-ui`;
       if(pw>52) g.fillText(q.label, x+pw/2, oy+bh/2-8*F);
       g.font=`${12*F}px system-ui`;
-      if(pw>34) g.fillText(`${q.len}mm`, x+pw/2, oy+bh/2+8*F);
+      if(pw>34) g.fillText(`${mm(q.len)}mm`, x+pw/2, oy+bh/2+8*F);
       /* のこぎりの通り道 */
       g.fillStyle='rgba(176,70,60,.32)';
       if(!q.endS) g.fillRect(x-KERF*sc,oy,KERF*sc,bh);
@@ -2697,7 +2746,7 @@ function drawSheet(){
           const tag=(txt,ty)=>{ const wd=g.measureText(txt).width+6;
             g.fillStyle='#fffdf8'; g.fillRect(hx-wd/2,ty-8,wd,16);
             g.fillStyle=cab?'#00913c':'#c96a00'; g.fillText(txt,hx,ty); };
-          tag(`${Math.round(q.x+along)}`, hy-half-11*F);
+          tag(`${mm(q.x+along)}`, hy-half-11*F);
           tag(cab?`φ${HOLE_D}`:`${HAND_W}×${HAND_H}`, hy+half+11*F);
           g.restore();
         }
@@ -2724,14 +2773,14 @@ function drawSheet(){
     g.fillStyle='#8a8070'; g.textAlign='center'; g.font=`${11.5*F}px system-ui`;
     for(const [a1,a2] of b.gaps){
       const gx=ox+a1*sc, gw=(a2-a1)*sc;
-      if(gw>40) g.fillText(`余り ${Math.round(a2-a1)}`, gx+gw/2, oy+bh/2);
+      if(gw>40) g.fillText(`余り ${mm(a2-a1)}`, gx+gw/2, oy+bh/2);
     }
 
     /* 下：一つずつの長さ／上：左端からの合計 */
     const cuts=[0];
     for(const q of b.placed){ cuts.push(q.x, q.x+q.len); }
     cuts.push(600);
-    const uniq=[...new Set(cuts.map(v=>Number(v.toFixed(3))))].sort((a,b)=>a-b);
+    const uniq=[...new Set(cuts.map(v=>Number(mm(v))))].sort((a,b)=>a-b);
     g.strokeStyle='#8a8070'; g.lineWidth=1; g.font=`${11.5*F}px system-ui`;
     const yb=oy+bh+22, yt=oy-24;
     for(let i=0;i<uniq.length-1;i++){
@@ -2776,7 +2825,7 @@ function buildParts(ps){
   for(const p of ps){
     const b=document.createElement('button');
     b.className=(state.selKind==='part'&&p.id===state.sel)?'on':'';b.dataset.partId=p.id;
-    b.innerHTML=`<span>${p.label}${p.moved?' ✎':''}</span><span class="sz">${Math.round(cutLen(p))}×${p.bw}</span>`;
+    b.innerHTML=`<span>${p.label}${p.moved?' ✎':''}</span><span class="sz">${mm(cutLen(p))}×${p.bw}</span>`;
     b.onclick=()=>focusParts([p.id]);
     list.appendChild(b);
   }
@@ -2962,7 +3011,7 @@ function buildRefs(){
 function partTable(ps,withCorners=false){
   const m=new Map();
   for(const p of ps){
-    const len=Math.round(cutLen(p)), key=p.bw+'x'+len+(withCorners?'|'+cornerText(p):'');
+    const len=cutLen(p), key=p.bw+'x'+len+(withCorners?'|'+cornerText(p):'');
     const base=withCorners?p.label:baseName(p.name);
     if(!m.has(key)) m.set(key,{names:[],bw:p.bw,len,n:0,first:p});
     const e=m.get(key);
@@ -2973,14 +3022,14 @@ function partTable(ps,withCorners=false){
 }
 function showTable(ps){
   $('ptbl').innerHTML=partTable(ps).map(r=>
-    `<tr><td>${r.names.join('・')}</td><td class="n">12×${r.bw}×${r.len}</td><td class="n">${r.n}</td></tr>`
+    `<tr><td>${r.names.join('・')}</td><td class="n">12×${mm(r.bw)}×${mm(r.len)}</td><td class="n">${r.n}</td></tr>`
   ).join('');
 }
 
 /* 材料の右はしにあいている長さ（ここが「まだ大きくできる」ぶん） */
 function tailRest(b){
   const g=b.gaps.find(a=>a[1]>=b.w-0.5);
-  return g?Math.round(g[1]-g[0]):0;
+  return g?Number(mm(g[1]-g[0])):0;
 }
 /* その寸法で材料に入りきるか（B案：入らないなら止める） */
 function partsFor(dd){
@@ -3246,7 +3295,7 @@ function buildHole(){
   if(state.hole){
     const p=ps.find(q=>q.id===state.hole.id);
     h+=`<p class="note">板の左端から <b>${state.hole.x}mm</b>`
-      +`（${p?Math.round(p.w):0}mmのうち）。緑の玉をドラッグ、または材料取り図でドラッグ（5mm刻み）。</p>`;
+      +`（${p?mm(p.w):0}mmのうち）。緑の玉をドラッグ、または材料取り図でドラッグ（5mm刻み）。</p>`;
   }else{
     h+='<p class="note">底板・棚板・天板だけ。作品にひとつまで。</p>';
   }
@@ -3384,7 +3433,7 @@ function buildCards(){
       <canvas></canvas>
       ${rec.has(key)?`<div class="rwhy">${esc(rec.get(key).why.slice(0,2).join('／'))}</div>`:''}
       <div class="why">${L.why.slice(0,2).join('／')}${L.why.length>2?'　他':''}</div>
-      <div class="mm">${defDims(key).W}×${W.D}×${defDims(key).H}mm<br>
+      <div class="mm">${outer(key,true).W}×${outer(key,true).D}×${outer(key,true).H}mm<br>
         部品${L.pieces}点・切る${L.cuts}回・釘約${L.nails}本<br>
         <span style="color:#8a5a2b">${W.original?'近藤オリジナル ／ '+(key==='K'?'糸のこで段付き加工':'縦びきなし・耐荷重未確認'):'説明書の難易度は'+'★'.repeat(W.manual)}</span></div>`;
     c.onclick=()=>chooseWork(key);
@@ -3487,9 +3536,12 @@ function updateStlSize(){
   if(stlBatch){const count=$('stlRange').value.length;$('stlSize').textContent=stlBatchName()+'の初期作品を'+(count===12?'4列×3行':'2列×3行')+'に配置。作品間に10mm以上の間隔を確保します。';return;}
   const bs=parts().map(bbox), d=Number($('stlScale').value);
   const size=[0,2,1].map(i=>(Math.max(...bs.map(b=>b.max[i]))-Math.min(...bs.map(b=>b.min[i])))/d);
-  $('stlSize').textContent='出力サイズ（幅×奥行×高さ）：'+size.map(v=>v.toFixed(1)).join(' × ')+' mm';
+  $('stlSize').textContent='出力サイズ（幅×奥行×高さ）：'+size.map(mm).join(' × ')+' mm';
 }
 function openStlDialog(batch){
+  if(!batch&&blockingIssues().length){
+    askModal('製作できる状態を確認してください','<p>材料・板の位置・角加工・穴を見直してからSTLを出力してください。</p>','3D画面で修正する',null,()=>goScreen('main',true));return;
+  }
   stlBatch=batch;
   $('stlRangeRow').hidden=!batch;
   $('stlTitle').textContent=batch?'作品をまとめて1つのSTLファイルに保存':'作品をSTLファイルに保存';
@@ -3510,6 +3562,7 @@ $('stlForm').onsubmit=async e=>{
   e.preventDefault();$('stlError').textContent='';
   const button=e.submitter;
   try{
+    if(!stlBatch&&blockingIssues().length)throw new Error('材料・接合面・釘の進路を修正してから出力してください');
     const batch=stlBatch,range=$('stlRange').value;
     const name=stlFilename(), divisor=Number($('stlScale').value);
     // 保存ダイアログを開く前に、選択範囲と生成内容を確定する。
@@ -3561,7 +3614,11 @@ function goScreen(k,skipCheck){
     if(overlappingParts(parts()).length||nest(parts()).left.length){
       askModal('この寸法では製作できません','<p>板の重なり、または材料不足を直してください。</p>','3D画面で修正する',null,()=>goScreen('main',true)); return;
     }
-    const ps=parts();
+    const ps=parts(),issues=constructionIssues(ps);
+    if(issues.length){
+      askModal('接合面を確認してください',issues.map(i=>`<p>${esc(i.t)}</p>`).join(''),
+        '3D画面で修正する',null,()=>{goScreen('main',true);focusParts(issues.flatMap(i=>i.ids));});return;
+    }
     if(nailSpots(ps,true).some(n=>!n.valid)){
       askModal('釘の進路と加工が重なっています（26mm想定）',
         '<p>角の加工または穴を見直してから、けがき・図面・説明書へ進んでください。</p>',
@@ -3589,7 +3646,7 @@ function endsUnused(){
   for(const b of boards){
     if(!b.placed.length) continue;
     const last=b.placed[b.placed.length-1];
-    if(last.x+last.len < b.w-0.5) bad.push({id:b.id,rest:Math.round(b.w-(last.x+last.len))});
+    if(last.x+last.len < b.w-0.5) bad.push({id:b.id,rest:Number(mm(b.w-(last.x+last.len)))});
   }
   return bad;
 }
@@ -3630,8 +3687,14 @@ function endsDialog(bad,onYes){
 }
 $('save').onclick=saveFile;
 $('dBack').onclick=()=>goScreen('main');
-$('vPrint').onclick=()=>{refreshDesignDocuments();window.print();};
-$('sPrint').onclick=()=>{refreshDesignDocuments();window.print();};
+function printDesign(){
+  if(blockingIssues().length){
+    askModal('製作できる状態を確認してください','<p>材料・板の位置・角加工・穴を見直してから印刷してください。</p>','3D画面で修正する',null,()=>goScreen('main',true));return;
+  }
+  refreshDesignDocuments();window.print();
+}
+$('vPrint').onclick=printDesign;
+$('sPrint').onclick=printDesign;
 $('aboutBtn').onclick=()=>{ $('about').hidden=false; };
 $('aboutBtn2').onclick=()=>{ $('about').hidden=false; };
 $('abClose').onclick=()=>{ $('about').hidden=true; };
@@ -3850,7 +3913,7 @@ function cornerSize(p,c){ return Math.min(c.size, Math.min(p.w,p.h)/2); }
 function CMAX(p){ return Math.max(2, Math.floor(Math.min(p.w,p.h)/2)); }
 function cornerText(p){
   const t=p.corners.map((c,i)=>c.type==='none'?null
-    :`${CNAME[i]}${c.type==='round'?'R':''}${Math.round(cornerSize(p,c))}`
+    :`${CNAME[i]}${c.type==='round'?'R':''}${mm(cornerSize(p,c))}`
      +`${c.type==='chamfer'?'斜め':''}`).filter(Boolean);
   return (p.profile?'段付き ':'')+(t.length?t.join(' '):(p.profile?'':'―'));
 }
@@ -3923,7 +3986,7 @@ function assemblySteps(ps){
     if(p.role==='part'){
       st.push(`${p.label}を図の位置に合わせ、${connections(p)}釘を打つ。`);
     }else if(p.posture==='flat')
-      st.push(`${p.label}を 高さ${Math.round(p.pos[1]+T/2)}mm の線に合わせて入れ、`
+      st.push(`${p.label}を 高さ${mm(p.pos[1]+T/2)}mm の線に合わせて入れ、`
         +`${connections(p)}釘を打つ。`);
     else if(p.posture==='side'){
       const d=dividerAssemblyDims(ps).find(d=>d.part.id===p.id);
@@ -4011,6 +4074,27 @@ function nailDatumSheet(ps){
     return pages;
   }).join('');
 }
+function mountingRows(ps){
+  return ps.filter(p=>['back','front','brace'].includes(p.role)).map(p=>{
+    const b=bbox(p);
+    return `${p.label||p.name}：地（設置面）から下端 ${mm(b.min[1])}mm ／ 上端 ${mm(b.max[1])}mm`;
+  });
+}
+function mountingSheet(ps){
+  const rows=mountingRows(ps);if(!rows.length)return '';
+  const body=`<text x="12" y="30" font-size="3.6">地＝家具を置く平らな面（0mm）。部品の下端・上端まで測ります。</text>`
+    +rows.map((row,i)=>`<text x="12" y="${43+i*13}" font-size="3.6">${esc(row)}</text>`).join('')
+    +`<text x="12" y="${55+rows.length*13}" font-size="3.3">左右は完成図に合わせ、釘の位置は部品別の釘位置図で確認してください。</text>`;
+  return sheetSvg(WORKS[state.work].name+'　背板・前板の取り付け高さ','単位mm ／ 変更後の設計位置を反映',body);
+}
+function noteSheets(lines){
+  let pages='';
+  for(let i=0;i<lines.length;i+=58){
+    const body=lines.slice(i,i+58).map((line,n)=>`<text x="12" y="${30+n*4.2}" font-size="3.05" fill="#4b423a">${esc(line)}</text>`).join('');
+    pages+=sheetSvg(WORKS[state.work].name+'　作業メモ（続き）','製作の手引きから続く文章です。',body);
+  }
+  return pages;
+}
 function dimensionOverview(ps){
   const d=dimsOf();
   return `<section class="dimension-overview" style="background:white;color:#2a2520;padding:18px;max-width:794px;margin:0 auto 16px;box-sizing:border-box">
@@ -4018,6 +4102,7 @@ function dimensionOverview(ps){
     <p>${WORKS[state.work].dims.map(t=>`${esc(t.label)}：<b>${mm(d[t.k])}</b>`).join(' ／ ')} ／ 板厚：12</p>
     <table style="width:100%;border-collapse:collapse"><thead><tr><th>部品</th><th>幅 × 高さ</th><th>角の加工・穴の中心</th></tr></thead><tbody>
     ${ps.map(p=>`<tr><td>${esc(p.label)}</td><td>${mm(p.w)} × ${mm(p.h)}</td><td>${esc(cornerText(p))}${holeOf(p)?` ／ 穴中心：左から${mm(holeOf(p).cx)}、下から${mm(holeOf(p).cy)} ／ ${holeOf(p).kind==='cable'?'直径25':'幅100×高さ30'}`:''}</td></tr>`).join('')}</tbody></table>
+    ${mountingRows(ps).length?`<p>${mountingRows(ps).map(esc).join('<br>')}</p>`:''}
     <p>この説明書ページを下へ進むと、完成寸法・部品表・材料取り・組み立て位置、追加加工の図、板の端から測る釘位置図を確認できます。穴や角の向きは部品ごとの図で確認してください。図は実寸ではありません。記載した数値で測ってください。</p>
     <p>印刷は複数枚です。加工図と釘位置図も一緒に使ってください。</p>
   </section>`;
@@ -4057,7 +4142,7 @@ function manualSheet(){
     const top=q.pos[1]+T/2;
     if(top<=13||top>=o.H-1) continue;
     const a=PF(0,0,0), b2=PF(0,top,0);
-    body+=dimSvg([rx,a[1]],[rx,b2[1]],7+(k++)*7,`${Math.round(top)}`,'v');
+    body+=dimSvg([rx,a[1]],[rx,b2[1]],7+(k++)*7,`${mm(top)}`,'v');
   }
   /* 平面図の寸法（おくゆき） */
   const tb=vTop.bb, tlx=vTop.px+tb.x*s;
@@ -4092,7 +4177,7 @@ function manualSheet(){
     const nameLines=wrapT(rowName,11);
     yy+=5.2;
     body+=`<g font-size="3.4" fill="#2a2520">${nameLines.map((t,i)=>`<text x="${M}" y="${yy+i*3.8}">${esc(t)}</text>`).join('')}
-      <text x="${M+40}" y="${yy}">12×${r.bw}×${r.len}</text>
+      <text x="${M+40}" y="${yy}">12×${mm(r.bw)}×${mm(r.len)}</text>
       <text x="${M+74}" y="${yy}">${r.n}</text>
       <text x="${M+82}" y="${yy}" font-size="3.1">${esc(first?cornerText(first):'―')}</text></g>`;
     yy+=(nameLines.length-1)*3.8;
@@ -4117,7 +4202,7 @@ function manualSheet(){
          stroke="#6b5233" stroke-width="0.3"/>`;
       body+=sharedBlankSvg(ps,q,qx,my-hh,sc,hh/b.h);
       if(qw>12) body+=`<text x="${qx+qw/2}" y="${my-hh/2+1.1}" font-size="2.7"
-         text-anchor="middle" fill="#3f3225">${q.len}</text>`;
+         text-anchor="middle" fill="#3f3225">${mm(q.len)}</text>`;
       if(q.endS) body+=`<rect x="${qx}" y="${my-hh}" width="0.9" height="${hh}" fill="#00a344"/>`;
       if(q.endE) body+=`<rect x="${qx+qw-0.9}" y="${my-hh}" width="0.9" height="${hh}" fill="#00a344"/>`;
     }
@@ -4153,16 +4238,21 @@ function manualSheet(){
   if(isOriginal()) notes.push(`※あなたのオリジナル寸法です。配られた説明書の数字とはちがいます。`);
   if(state.comment) notes.push(`この寸法にした理由：${state.comment}`);
   // 右列の幅に合わせる（全角1文字をフォントサイズ分として見積もる）。
-  const noteChars=Math.floor(mw/3.05);
+  const noteChars=Math.floor(mw/3.05),overflowNotes=[];
   for(const t of notes){ for(const ln of wrapT(t,noteChars)){
-    body+=`<text x="${mx}" y="${by2}" font-size="3.05" fill="#4b423a">${esc(ln)}</text>`; by2+=3.9; }
+    if(by2<=277)body+=`<text x="${mx}" y="${by2}" font-size="3.05" fill="#4b423a">${esc(ln)}</text>`;
+    else overflowNotes.push(ln);
+    by2+=3.9; }
     by2+=0.6; }
+  if(overflowNotes.length)body+=`<text x="${mx}" y="284" font-size="3" fill="#4b423a">作業メモの続きは次ページへ</text>`;
+  const allNameLines=wrapT(state.who||'',14),nameLines=allNameLines.slice(0,3);
+  if(allNameLines.length>3)overflowNotes.push('名前（続き）',...allNameLines.slice(3));
   body+=`<g font-size="3.4" fill="#2a2520">
     <text x="${PW-M-52}" y="14">名前</text>
     <line x1="${PW-M-44}" y1="15" x2="${PW-M}" y2="15" stroke="#7b7166" stroke-width="0.3"/>
-    <text x="${PW-M-42}" y="13.6">${esc(state.who||'')}</text></g>`;
+    ${nameLines.map((line,i)=>`<text x="${PW-M-42}" y="${7+i*3.2}" font-size="2.8">${esc(line)}</text>`).join('')}</g>`;
   return dimensionOverview(ps)+sheetSvg(`${W.name}　製作の手引き`,
-    `尺度 ${scaleText(s)}　／　外はば${o.W}×おくゆき${o.D}×高さ${o.H}mm　／　板の厚さ12mm`, body)+manufacturingSheet(ps)+nailDatumSheet(ps);
+    `尺度 ${scaleText(s)}　／　外はば${o.W}×おくゆき${o.D}×高さ${o.H}mm　／　板の厚さ12mm`, body)+noteSheets(overflowNotes)+mountingSheet(ps)+manufacturingSheet(ps)+nailDatumSheet(ps);
 }
 function esc(t){ return String(t).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
 function sheetSvg(title,sub,body){
