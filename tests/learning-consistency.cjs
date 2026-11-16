@@ -7,13 +7,15 @@ fs.mkdirSync(output,{recursive:true});
  try{
   const page=await browser.newPage({viewport:{width:1366,height:768},acceptDownloads:true}),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('file:///'+path.join(__dirname,'../index.html').replace(/\\/g,'/'));
+  await page.goto(process.env.APP_URL||'file:///'+path.join(__dirname,'../index.html').replace(/\\/g,'/'));
   const report=[];
   for(const key of 'ABCDEFGHIJKL'){
    await page.evaluate(k=>chooseWork(k,true),key);
+   await page.locator('#dimStep5').uncheck();
    const dimensions=await page.locator('#size3 input[data-d]').evaluateAll(es=>es.map(e=>({k:e.dataset.d,min:+e.min,max:+e.max,initial:+e.value,step:+e.step})));
    for(const dim of dimensions)for(const requested of [dim.min,dim.max,dim.initial-(dim.initial-dim.min)/2]){
     await page.evaluate(k=>chooseWork(k,true),key);
+   await page.locator('#dimStep5').uncheck();
     const slider=page.locator(`#size3 input[data-d="${dim.k}"]`);
     const attempted=await slider.evaluate((e,v)=>{e.value=v;const attempted=+e.value;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));return attempted;},requested);
     const model=await page.evaluate(()=>{
