@@ -206,6 +206,7 @@ header .about{font-size:11px;color:var(--sub);text-decoration:underline;cursor:p
 .card.rec{border-color:var(--accent);box-shadow:0 0 0 2px #e8d5b8}
 .card .rwhy{font-size:10.5px;color:var(--accent);line-height:1.5}
 
+@media print{.dimension-overview{display:none!important}}
 /* ---------- 紙の画面（見た目図・説明書） ---------- */
 .paper{position:fixed;inset:42px 0 0;z-index:30;background:#efeae0;display:flex;flex-direction:column}
 .paper .pbar{display:flex;gap:8px;align-items:center;padding:7px 12px;background:var(--panel);
@@ -766,6 +767,7 @@ const state={ work:'A', corners:{}, off:{}, refs:[], nextRef:1, sel:null, selKin
   quiz:null, reco:null, refFull:null, // そうだんの答え・おすすめ作品・入りきらなかった物
   warned:false,        // 「材料の右はしが余っている」に一度OKしたか
   who:'',              // 名前（説明書に印刷する）
+  dimStep5:true,        // 生徒が解除すると1mm単位
   dims:{},             // スライダーで変えた寸法（作品を選びなおすとまっさら）
   comment:'',          // オリジナル寸法にした理由（けがきへ行く前に必要）
   hole:null,           // ケーブルの穴 {id:板のid, x:板の左端からの中心位置mm}（作品に1つ）
@@ -2987,14 +2989,14 @@ function fitsNow(){ const ps=parts(); return nest(ps).left.length===0&&!overlapp
 function dimSpan(t,d){
   const g=dimLim(t,d), cur=clamp(d[t.k],g[0],g[1]);
   const ok=v=>{ const dd={...d}; dd[t.k]=v; return fitsWith(dd); };
-  const grid=v=>Math.round(v/t.step)*t.step;
+  const grid=v=>Math.round(v);
   let hi=g[1];
   if(!ok(hi)){ let lo=cur, h=hi;
-    while(h-lo>t.step){ const m=grid((lo+h)/2); if(m<=lo||m>=h) break; ok(m)?lo=m:h=m; }
+    while(h-lo>1){ const m=grid((lo+h)/2); if(m<=lo||m>=h) break; ok(m)?lo=m:h=m; }
     hi=lo; }
   let lo=g[0];
   if(!ok(lo)){ let l=lo, h=cur;
-    while(h-l>t.step){ const m=grid((l+h)/2); if(m<=l||m>=h) break; ok(m)?h=m:l=m; }
+    while(h-l>1){ const m=grid((l+h)/2); if(m<=l||m>=h) break; ok(m)?h=m:l=m; }
     lo=h; }
   return [Math.min(lo,cur), Math.max(hi,cur)];
 }
@@ -3004,7 +3006,7 @@ function rescue(tried,k){
   for(const t2 of WORKS[state.work].dims){
     if(t2.k===k) continue;
     const g=dimLim(t2,tried); let best=null;
-    for(let v=g[0];v<=g[1];v+=t2.step){
+    for(let v=g[0];v<=g[1];v+=dimensionStep()){
       if(v===tried[t2.k]) continue;              // 変えないのは助けにならない
       const dd={...tried}; dd[t2.k]=v;
       if(!fitsWith(dd)) continue;
@@ -3030,12 +3032,10 @@ function suggestWork(d){
 }
 /* スライダーを動かす。材料が足りなくなる手前で止める */
 /* 目もりは「説明書の値」を基準にする。そうしないと 177mm が スライダーで出せない */
+function dimensionStep(){ return state.dimStep5?5:1; }
 function dimLim(t,d){
   const L=t.lim?t.lim(d):[t.min,t.max];
-  const g=v=>t.def+Math.round((v-t.def)/t.step)*t.step;        // def をふくむ目もりに乗せる
-  let lo=g(Math.max(t.min,L[0])), hi=g(Math.min(t.max,L[1]));
-  if(lo<t.min||lo<L[0]) lo+=t.step;
-  if(hi>t.max||hi>L[1]) hi-=t.step;
+  const lo=Math.ceil(Math.max(t.min,L[0])), hi=Math.floor(Math.min(t.max,L[1]));
   return [lo,Math.max(lo,hi)];
 }
 /* 寸法を変えたあと、はみ出した値をぜんぶ入れなおす（穴もふくめて） */
@@ -3135,9 +3135,11 @@ function makeDimDOM(){
   const W=WORKS[state.work];
   $('size3').innerHTML =
     '<div class="orig" hidden></div><div class="bar"></div>'
+   + '<label><input type="checkbox" id="dimStep5">5mm刻みで調整する（外すと1mm刻み）</label>'
+   + '<p class="tip">5mm刻みは教材の初期寸法が基準です。切り替えても現在の寸法は変わりません。</p>'
    + W.dims.map(t=>`<div class="dimrow" data-k="${t.k}">
        <div class="lb"><span>${t.label}</span><b></b></div>
-       <input type="range" data-d="${t.k}" step="${t.step}">
+       <input type="range" data-d="${t.k}" step="1" aria-label="${t.label}（mm）">
        <div class="rng"><span></span><button class="why" hidden></button></div>
      </div>`).join('')
    + '<div class="tip">材料は '+STOCK.map(m=>`幅${m.h}×${m.w}mm`).join('・')
@@ -3150,12 +3152,19 @@ function makeDimDOM(){
   $('size3').querySelectorAll('input[type=range]').forEach(r=>{
     const grab=()=>{ dimDrag=r; };
     r.addEventListener('pointerdown',grab);
-    r.addEventListener('keydown',grab);
+    r.addEventListener('keydown',e=>{
+      if(['ArrowLeft','ArrowDown','ArrowRight','ArrowUp'].includes(e.key)){
+        e.preventDefault();
+        trySetDim(r.dataset.d,dimsOf()[r.dataset.d]+(['ArrowLeft','ArrowDown'].includes(e.key)?-1:1)*dimensionStep(),true);
+      }
+    });
     r.addEventListener('input',()=>{
       const k=r.dataset.d;
       /* ドラッグ中は、材料に入らない値なら黙って止めるだけ（説明はつまみを離してから） */
       const before=parts();
-      if(!trySetDim(k,+r.value,true))r.value=dimsOf()[k];
+      const t=W.dims.find(t=>t.k===k), raw=+r.value;
+      const value=state.dimStep5?t.def+Math.round((raw-t.def)/5)*5:raw;
+      if(!trySetDim(k,value,true))r.value=dimsOf()[k];
       else r.changedParts=[...new Set([...(r.changedParts||[]),...parts().filter(p=>{const q=before.find(q=>q.id===p.id);return !q||JSON.stringify([p.w,p.h,p.pos])!==JSON.stringify([q.w,q.h,q.pos]);}).map(p=>p.id)])];
     });
     const drop=()=>{if(dimDrag===r){dimDrag=null;refresh();}if(r.changedParts?.length){const ids=r.changedParts;r.changedParts=[];focusParts(ids,'寸法が変わった板です。けがき・見た目図・⑤説明書も現在の寸法で更新します。');}};
@@ -3168,6 +3177,7 @@ function makeDimDOM(){
   $('size3').querySelectorAll('button.why').forEach(bt=>{
     bt.onclick=()=>limitDialog(bt.dataset.why,+bt.dataset.wv);
   });
+  $('dimStep5').onchange=e=>{state.dimStep5=e.target.checked;dimDrag=null;refresh();};
   $('dimReset').onclick=()=>{
     const previous={dims:state.dims,hole:state.hole?{...state.hole}:null,handleY:state.handleY};
     state.dims={};clampAll();
@@ -3181,6 +3191,7 @@ function makeDimDOM(){
 }
 function buildDims(){
   if(dimKey!==state.work){ makeDimDOM(); dimKey=state.work; }
+  $('dimStep5').checked=state.dimStep5;
   const W=WORKS[state.work], d=dimsOf(), f=defDims(state.work);
   const o=outer(), {boards}=nest(parts()), box=$('size3');
   const ob=box.querySelector('.orig');
@@ -3205,7 +3216,7 @@ function buildDims(){
     if(!bt.hidden){
       bt.textContent=(stuck?'動かせません':(atMax?'いま最大':'いま最小'))+'・なぜ？';
       bt.dataset.why=t.k;
-      bt.dataset.wv=(atMin&&!atMax)?lm[0]-t.step:lm[1]+t.step;
+      bt.dataset.wv=(atMin&&!atMax)?lm[0]-dimensionStep():lm[1]+dimensionStep();
     }
   }
   box.querySelector('.row.back').hidden=!isOriginal();
@@ -3397,7 +3408,7 @@ function chooseWork(key,discard=false){
   nestMessage='';
   state.work=key; state.corners={}; state.off={}; state.nestX={}; state.nestBoard={}; state.flip={};
   state.hole=null; state.handle=false; state.handleY=40;
-  state.dims={}; state.comment=''; state.warned=false; dimKey=null; dimDrag=null;
+  state.dimStep5=true; state.dims={}; state.comment=''; state.warned=false; dimKey=null; dimDrag=null;
   $('quiz').hidden=$('draw').hidden=$('view').hidden=$('sheet').hidden=true;
   state.refs.forEach(restRef);
   state.sel=baseParts()[0].id; state.selKind='part';
@@ -3512,7 +3523,7 @@ $('stlForm').onsubmit=async e=>{
 function saveFile(){
   const d=JSON.stringify({version:11,work:state.work,corners:state.corners,
     off:state.off,nestX:state.nestX,nestBoard:state.nestBoard,flip:state.flip,
-    dims:state.dims,comment:state.comment,who:state.who,scene:state.scene,
+    dimStep5:state.dimStep5,dims:state.dims,comment:state.comment,who:state.who,scene:state.scene,
     quiz:state.quiz,reco:state.reco,
     hole:state.hole,handle:state.handle,handleY:state.handleY,
     refs:state.refs,nextRef:state.nextRef},null,1);
@@ -3670,7 +3681,7 @@ $('openFile').onchange=e=>{
       state.work=d.work; state.corners=d.corners||{}; state.off=d.off||{};
       state.nestX=d.nestX||{}; state.nestBoard=d.nestBoard||{}; state.flip=d.flip||{};
       state.hole=d.hole||null; state.handle=!!d.handle; state.handleY=d.handleY??40;
-      state.dims=d.dims||{}; state.comment=d.comment||''; state.who=d.who||'';
+      state.dimStep5=d.dimStep5!==false; state.dims=d.dims||{}; state.comment=d.comment||''; state.who=d.who||'';
       state.scene=SCENES[d.scene]?d.scene:'desk';
       state.quiz=d.quiz||null; state.reco=d.reco||null;
       const ss=$('sceneSel'); if(ss) ss.value=state.scene;
@@ -3995,6 +4006,17 @@ function nailDatumSheet(ps){
     return pages;
   }).join('');
 }
+function dimensionOverview(ps){
+  const d=dimsOf();
+  return `<section class="dimension-overview" style="background:white;color:#2a2520;padding:18px;max-width:794px;margin:0 auto 16px;box-sizing:border-box">
+    <h2>自分の家具の寸法一覧（単位：mm）</h2>
+    <p>${WORKS[state.work].dims.map(t=>`${esc(t.label)}：<b>${mm(d[t.k])}</b>`).join(' ／ ')} ／ 板厚：12</p>
+    <table style="width:100%;border-collapse:collapse"><thead><tr><th>部品</th><th>幅 × 高さ</th><th>角の加工・穴の中心</th></tr></thead><tbody>
+    ${ps.map(p=>`<tr><td>${esc(p.label)}</td><td>${mm(p.w)} × ${mm(p.h)}</td><td>${esc(cornerText(p))}${holeOf(p)?` ／ 穴中心：左から${mm(holeOf(p).cx)}、下から${mm(holeOf(p).cy)} ／ ${holeOf(p).kind==='cable'?'直径25':'幅100×高さ30'}`:''}</td></tr>`).join('')}</tbody></table>
+    <p>この説明書ページを下へ進むと、完成寸法・部品表・材料取り・組み立て位置、追加加工の図、板の端から測る釘位置図を確認できます。穴や角の向きは部品ごとの図で確認してください。図は実寸ではありません。記載した数値で測ってください。</p>
+    <p>印刷は複数枚です。加工図と釘位置図も一緒に使ってください。</p>
+  </section>`;
+}
 function manualSheet(){
   const ps=parts(), W=WORKS[state.work], o=outer(), L=workload(state.work);
   const {boards}=nest(ps);
@@ -4134,7 +4156,7 @@ function manualSheet(){
     <text x="${PW-M-52}" y="14">名前</text>
     <line x1="${PW-M-44}" y1="15" x2="${PW-M}" y2="15" stroke="#7b7166" stroke-width="0.3"/>
     <text x="${PW-M-42}" y="13.6">${esc(state.who||'')}</text></g>`;
-  return sheetSvg(`${W.name}　製作の手引き`,
+  return dimensionOverview(ps)+sheetSvg(`${W.name}　製作の手引き`,
     `尺度 ${scaleText(s)}　／　外はば${o.W}×おくゆき${o.D}×高さ${o.H}mm　／　板の厚さ12mm`, body)+manufacturingSheet(ps)+nailDatumSheet(ps);
 }
 function esc(t){ return String(t).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
