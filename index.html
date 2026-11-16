@@ -1083,24 +1083,26 @@ function endReport(ps){
 
 /* =========================================================
    5.5) 釘の位置
-   2枚の板が面で接しているところが「接合」。1か所につき2本打つ。
-   薄いほう（板厚12mm）の板から、相手に向かって打ち込む。
+   板の広い面から相手へ打つ接合だけを釘の対象にする。
+   木端どうしが触れても釘は追加しない。打つ本数は接合長から決める。
    ========================================================= */
-function joints(ps){
+function boardNormalAxis(p){ return {side:0,flat:1,front:2}[p.posture]; }
+function joints(ps,tolerance=1e-6){
   const out=[], bs=ps.map(bbox);
   for(let i=0;i<bs.length;i++) for(let j=i+1;j<bs.length;j++){
     const a=bs[i], b=bs[j];
     for(let k=0;k<3;k++){
+      // 背板どうしなど、木端だけの接触へ板厚方向以外から釘を自動生成しない。
+      if(boardNormalAxis(ps[i])!==k&&boardNormalAxis(ps[j])!==k)continue;
       let dir=0, plane=0;
-      if(Math.abs(a.max[k]-b.min[k])<0.6){ dir=1;  plane=a.max[k]; }   // a→b が＋向き
-      else if(Math.abs(b.max[k]-a.min[k])<0.6){ dir=-1; plane=a.min[k]; }
+      if(Math.abs(a.max[k]-b.min[k])<tolerance){ dir=1;  plane=a.max[k]; }   // a→b が＋向き
+      else if(Math.abs(b.max[k]-a.min[k])<tolerance){ dir=-1; plane=a.min[k]; }
       else continue;
       const ax=[0,1,2].filter(m=>m!==k);
       const lo=ax.map(m=>Math.max(a.min[m],b.min[m]));
       const hi=ax.map(m=>Math.min(a.max[m],b.max[m]));
       if(hi[0]-lo[0]<=5 || hi[1]-lo[1]<=5) continue;
-      const ta=a.max[k]-a.min[k], tb=b.max[k]-b.min[k];
-      const fromA=Math.abs(ta-T) <= Math.abs(tb-T);
+      const fromA=boardNormalAxis(ps[i])===k;
       out.push({k,dir,plane,ax,lo,hi,fromA,a:i,b:j});
       break;
     }
@@ -1144,7 +1146,8 @@ function jointSupported(p,jt){
   return true;
 }
 function constructionIssues(ps=parts()){
-  const actual=joints(ps),nominal=ps.map(p=>({...p,pos:p.pos.map((v,i)=>v-(state.off[p.id]?.[i]||0))}));
+  // 隙間の警告では従来の許容幅も調べる。釘の生成は実際に接する面だけ。
+  const actual=joints(ps,0.6),nominal=ps.map(p=>({...p,pos:p.pos.map((v,i)=>v-(state.off[p.id]?.[i]||0))}));
   const pair=j=>[ps[j.a].id,ps[j.b].id].sort().join('|');
   const found=new Map(actual.map(j=>[pair(j),j])),issues=[];
   for(const expected of joints(nominal)){
