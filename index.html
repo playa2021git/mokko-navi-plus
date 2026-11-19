@@ -300,6 +300,11 @@ body.dim main{height:calc(100vh - 42px)}
 #studyGrid figure{user-select:none;min-width:0}
 #studyGrid figure.masked svg{visibility:hidden}
 #studyGrid figure.masked figcaption::after{content:"（ダブルクリックで再表示）"}
+#stage.study-full{position:fixed;inset:0;z-index:1000;background:#fffdf8}
+#stage.study-full .viewbar>:not(#fourViews):not(#viewSizes),#stage.study-full .hint,#stage.study-full .learning-status{display:none}
+#stage.study-full .viewbar{justify-content:center}
+#studyGrid .measure{stroke:#16518a;stroke-width:.45}
+#studyGrid .measure text{fill:#16518a;stroke:#fffdf8;stroke-width:1.4;paint-order:stroke;font-size:4px;text-anchor:middle}
 #studyGrid{display:grid;height:100%;grid-template:1fr 1fr / 1fr 1fr}
 #studyPane .a4{display:block;width:100%;height:auto}
 #stage .viewbar{z-index:4;right:8px}
@@ -350,7 +355,7 @@ body.dim main{height:calc(100vh - 42px)}
       <button data-v="fit">作品に寄る</button><button data-v="desk">引いて見る</button><button data-z="in">＋</button><button data-z="out">－</button>
       <span class="vwrap"></span>
       <button id="fourViews" aria-pressed="false">4面モード</button>
-      <button id="viewSizes" hidden aria-pressed="false">各面の寸法</button>
+      <button id="viewSizes" hidden class="on" aria-pressed="true">各面の寸法</button>
       <button id="cutStudy" aria-pressed="false">加工：板の長さだけ</button>
       <button id="nailStudy" aria-pressed="false">組み立て：釘の位置</button>
       <button id="roomBtn">置いて見る</button>
@@ -3406,9 +3411,10 @@ function showWork(){
     `<span class="tag" style="background:#efe6d6">${L.why[0]}</span>`;
 }
 
-const studyZoom=new Map(), maskedViews=new Set();
-function studyViewBox(key){
-  const zoom=studyZoom.get(key)||1, width=150/zoom, height=100/zoom;
+let studyZoom=1;
+const maskedViews=new Set();
+function studyViewBox(){
+  const width=150/studyZoom, height=100/studyZoom;
   return [75-width/2,50-height/2,width,height].join(' ');
 }
 const studyPane=$('studyPane');
@@ -3416,12 +3422,11 @@ studyPane.addEventListener('wheel',event=>{
   const figure=event.target.closest('figure[data-view]');
   if(!figure || !event.deltaY)return;
   event.preventDefault();
-  const key=figure.dataset.view;
-  if(maskedViews.has(key))return;
+
   const units=event.deltaMode===1?16:event.deltaMode===2?figure.clientHeight:1;
   const step=Math.max(-0.5,Math.min(0.5,event.deltaY*units*0.002));
-  studyZoom.set(key,Math.max(0.25,Math.min(8,(studyZoom.get(key)||1)*Math.exp(-step))));
-  figure.querySelector('svg').setAttribute('viewBox',studyViewBox(key));
+  studyZoom=Math.max(0.25,Math.min(8,studyZoom*Math.exp(-step)));
+  for(const svg of studyPane.querySelectorAll('figure svg'))svg.setAttribute('viewBox',studyViewBox());
 },{passive:false});
 studyPane.addEventListener('dblclick',event=>{
   const figure=event.target.closest('figure[data-view]');
@@ -3432,6 +3437,7 @@ studyPane.addEventListener('dblclick',event=>{
 });
 function renderStudy(ps){
   const pane=$('studyPane'), mode=pane.dataset.mode;
+  $('stage').classList.toggle('study-full',mode==='fourViews');
   pane.hidden=!mode;
   $('viewSizes').hidden=mode!=='fourViews';
   for(const id of ['fourViews','cutStudy','nailStudy']){
@@ -3446,11 +3452,29 @@ function renderStudy(ps){
     pane.innerHTML=nailDatumSheet(ps);
   }else{
     const sizes=$('viewSizes').getAttribute('aria-pressed')==='true',o=outer();
-    const labels={top:'幅 '+o.W+' × 奥行 '+o.D,front:'幅 '+o.W+' × 高さ '+o.H,right:'奥行 '+o.D+' × 高さ '+o.H,iso:'幅 '+o.W+' × 奥行 '+o.D+' × 高さ '+o.H};
     const keys=['top','iso','front','right'];
-    const fit=k=>{const b=viewShapes(k,ps).bb;return Math.min(144/b.w,95/b.h);};
+    const boxes=ps.map(bbox);
+    const lo=[0,1,2].map(i=>Math.min(...boxes.map(b=>b.min[i])));
+    const hi=[0,1,2].map(i=>Math.max(...boxes.map(b=>b.max[i])));
+    const fit=k=>{const b=viewShapes(k,ps).bb;return Math.min(116/b.w,73/b.h);};
     const scale=Math.min(...['top','front','right'].map(fit));
-    pane.innerHTML='<div id="studyGrid">'+keys.map(k=>'<figure title="スクロールで拡大・縮小、ダブルクリックで表示切替" data-view="'+k+'" class="'+(maskedViews.has(k)?'masked':'')+'"><figcaption>'+VIEWS3[k].name+(sizes?'　'+labels[k]+' mm':'')+'</figcaption><svg viewBox="'+studyViewBox(k)+'">'+placeView(k,ps,k==='iso'?fit(k):scale,0,0,150,100).svg+'</svg></figure>').join('')+'</div>';
+    pane.innerHTML='<div id="studyGrid">'+keys.map(k=>{
+      const view=placeView(k,ps,k==='iso'?fit(k):scale,0,0,150,100);
+      const frontLeft=[lo[0],lo[1],hi[2]], frontRight=[hi[0],lo[1],hi[2]];
+      let overlay='';
+      function measure(a,b,offset,label){
+        const [x,y]=view.P(...a),[u,v]=view.P(...b);
+        const length=Math.hypot(u-x,v-y),nx=(y-v)/length,ny=(u-x)/length;
+        const dx=nx*offset,dy=ny*offset;
+        overlay+=`<g class="measure"><line x1="${x}" y1="${y}" x2="${x+dx*1.2}" y2="${y+dy*1.2}"/><line x1="${u}" y1="${v}" x2="${u+dx*1.2}" y2="${v+dy*1.2}"/><line x1="${x+dx}" y1="${y+dy}" x2="${u+dx}" y2="${v+dy}"/><text x="${(x+u)/2+dx}" y="${(y+v)/2+dy}">${label} mm</text></g>`;
+      }
+      if(sizes){
+        if(k!=='right')measure(frontLeft,frontRight,6,'幅 '+o.W);
+        if(k!=='front')measure(frontRight,[hi[0],lo[1],lo[2]],6,'奥行 '+o.D);
+        if(k!=='top')measure(frontLeft,[lo[0],hi[1],hi[2]],-6,'高さ '+o.H);
+      }
+      return `<figure title="スクロールで4面を拡大・縮小、ダブルクリックで表示切替" data-view="${k}" class="${maskedViews.has(k)?'masked':''}"><figcaption>${VIEWS3[k].name}</figcaption><svg viewBox="${studyViewBox()}">${view.svg}${overlay}</svg></figure>`;
+    }).join('')+'</div>';
   }
 }
 function refresh(){
