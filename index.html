@@ -352,6 +352,7 @@ body.dim main{height:calc(100vh - 42px)}
     <div class="viewbar">
       <button data-v="iso">ななめ</button><button data-v="front">正面</button>
       <button data-v="side">横</button><button data-v="top">上</button>
+      <button data-pan="-1" title="作品を画面の上に移動" aria-label="作品を画面の上に移動">↑</button><button data-pan="1" title="作品を画面の下に移動" aria-label="作品を画面の下に移動">↓</button>
       <button data-v="fit">作品に寄る</button><button data-v="desk">引いて見る</button><button data-z="in">＋</button><button data-z="out">－</button>
       <span class="vwrap"></span>
       <button id="fourViews" aria-pressed="false">4面モード</button>
@@ -2117,8 +2118,14 @@ if(HAS3D){
   const VIEWS={iso:[-0.72,0.42],front:[0,0.02],side:[Math.PI/2,0.02],top:[0,1.44]};
   document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{
     if(b.dataset.v==='fit'){fitView();return;}
-    if(b.dataset.v==='desk'){ if(!state.room){state.room=true;refresh();} fitRoom(); return; }
+    if(b.dataset.v==='desk'){ orbit.dist=Math.min(Math.max(3500,orbit.dist),orbit.dist*1.5); return; }
     const v=VIEWS[b.dataset.v]; orbit.yaw=v[0]; orbit.pitch=v[1]; });
+  document.querySelectorAll('[data-pan]').forEach(button=>button.onclick=()=>{
+    applyCam();
+    const screenUp=new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion);
+    const visibleHeight=2*orbit.dist*Math.tan(THREE.MathUtils.degToRad(camera.fov/2));
+    orbit.target.addScaledVector(screenUp,Number(button.dataset.pan)*visibleHeight*0.08);
+  });
   document.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{
     orbit.dist=Math.max(120,Math.min(3500,orbit.dist*(b.dataset.z==='in'?.82:1.22))); });
 
