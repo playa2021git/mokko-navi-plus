@@ -294,6 +294,12 @@ body.dim main{height:calc(100vh - 42px)}
 .measure-readout{font-size:12px;color:#245c89;padding:5px 12px;background:#f5f8fa;border-bottom:1px solid #d8e1e8}
 @media(prefers-reduced-motion:reduce){.learn-cue,.measure-cue path{animation:none!important}.acc>h2::before{transition:none}}
 @media print{.learning-status,.measure-readout,.measure-cue{display:none!important}.nail-trigger{outline:none!important}.learn-cue{animation:none!important;outline:none!important;box-shadow:none!important}}
+#studyPane{position:absolute;inset:0;z-index:3;background:#fffdf8;overflow:auto;padding:8px}
+#studyPane figure{margin:0;padding:5px;border:1px solid #d8d0c2;display:flex;flex-direction:column;min-height:0}
+#studyPane figure svg{width:100%;flex:1;min-height:0}
+#studyGrid{display:grid;height:100%;grid-template:1fr 1fr / 1fr 1fr}
+#studyPane .a4{display:block;width:100%;height:auto}
+#stage .viewbar{z-index:4;right:8px}
 </style>
 </head>
 <body>
@@ -340,11 +346,16 @@ body.dim main{height:calc(100vh - 42px)}
       <button data-v="side">横</button><button data-v="top">上</button>
       <button data-v="fit">作品に寄る</button><button data-v="desk">引いて見る</button><button data-z="in">＋</button><button data-z="out">－</button>
       <span class="vwrap"></span>
+      <button id="fourViews" aria-pressed="false">4面モード</button>
+      <button id="viewSizes" hidden aria-pressed="false">各面の寸法</button>
+      <button id="cutStudy" aria-pressed="false">加工：板の長さだけ</button>
+      <button id="nailStudy" aria-pressed="false">組み立て：釘の位置</button>
       <button id="roomBtn">置いて見る</button>
       <select id="sceneSel" title="置く場所"></select>
       <button id="nameBtn">板の名前</button><button id="nailBtn">釘を見る</button>
       <button id="endBtn">材料の両はし</button><button id="dimBtn">寸法を見る</button>
     </div>
+    <div id="studyPane" hidden></div>
     <canvas id="dimCv" hidden></canvas>
     <div class="learning-status" id="learningStatus" role="status" aria-live="polite">板を選ぶと、3Dと材料取り図で同じ板を確認できます。</div>
     <div class="hint" id="hint"></div>
@@ -3392,8 +3403,32 @@ function showWork(){
     `<span class="tag" style="background:#efe6d6">${L.why[0]}</span>`;
 }
 
+function renderStudy(ps){
+  const pane=$('studyPane'), mode=pane.dataset.mode;
+  pane.hidden=!mode;
+  $('viewSizes').hidden=mode!=='fourViews';
+  for(const id of ['fourViews','cutStudy','nailStudy']){
+    $(id).setAttribute('aria-pressed',String(id===mode));
+    $(id).classList.toggle('on',id===mode);
+  }
+  $('fourViews').textContent=mode==='fourViews'?'1面に戻す':'4面モード';
+  if(!mode)return;
+  if(mode==='cutStudy'){
+    pane.innerHTML='<h3>加工する板の長さ</h3>'+ps.map(p=>'<p>'+esc(p.label)+'　'+mm(cutLen(p))+' mm</p>').join('');
+  }else if(mode==='nailStudy'){
+    pane.innerHTML=nailDatumSheet(ps);
+  }else{
+    const sizes=$('viewSizes').getAttribute('aria-pressed')==='true',o=outer();
+    const labels={top:'幅 '+o.W+' × 奥行 '+o.D,front:'幅 '+o.W+' × 高さ '+o.H,right:'奥行 '+o.D+' × 高さ '+o.H,iso:'幅 '+o.W+' × 奥行 '+o.D+' × 高さ '+o.H};
+    const keys=['top','iso','front','right'];
+    const fit=k=>{const b=viewShapes(k,ps).bb;return Math.min(144/b.w,95/b.h);};
+    const scale=Math.min(...['top','front','right'].map(fit));
+    pane.innerHTML='<div id="studyGrid">'+keys.map(k=>'<figure><figcaption>'+VIEWS3[k].name+(sizes?'　'+labels[k]+' mm':'')+'</figcaption><svg viewBox="0 0 150 100">'+placeView(k,ps,k==='iso'?fit(k):scale,0,0,150,100).svg+'</svg></figure>').join('')+'</div>';
+  }
+}
 function refresh(){
   const ps=parts();
+  renderStudy(ps);
   const left=drawNest();
   const {msgs,bad}=checkAll(ps,left);
   rebuild(ps,state.refs,bad);
@@ -3512,6 +3547,13 @@ $('sceneSel').onchange=e=>{ state.scene=e.target.value;
 $('nailBtn').onclick=()=>{ state.showNails=!state.showNails; refresh(); };
 $('nameBtn').onclick=()=>{ state.showNames=!state.showNames; refresh(); };
 $('endBtn').onclick =()=>{ state.showEnds =!state.showEnds;  refresh(); };
+const studyBar=document.querySelector('#stage .viewbar');
+new ResizeObserver(()=>{$('studyPane').style.top=(studyBar.offsetTop+studyBar.offsetHeight+4)+'px';}).observe(studyBar);
+for(const id of ['fourViews','cutStudy','nailStudy']){
+  $(id).onclick=()=>{const pane=$('studyPane');pane.dataset.mode=pane.dataset.mode===id?'':id;renderStudy(parts());pane.scrollTop=0;};
+}
+$('viewSizes').onclick=()=>{const b=$('viewSizes');b.setAttribute('aria-pressed',String(b.getAttribute('aria-pressed')!=='true'));b.classList.toggle('on',b.getAttribute('aria-pressed')==='true');renderStudy(parts());};
+studyBar.addEventListener('click',e=>{if(e.target.closest('button,select')&&!['fourViews','viewSizes','cutStudy','nailStudy'].includes(e.target.id)){$('studyPane').dataset.mode='';renderStudy(parts());}},true);
 $('dimBtn').onclick=()=>{
   state.showDim=!state.showDim;
   $('dimCv').hidden=!state.showDim;
