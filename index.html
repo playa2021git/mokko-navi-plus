@@ -297,6 +297,9 @@ body.dim main{height:calc(100vh - 42px)}
 #studyPane{position:absolute;inset:0;z-index:3;background:#fffdf8;overflow:auto;padding:8px}
 #studyPane figure{margin:0;padding:5px;border:1px solid #d8d0c2;display:flex;flex-direction:column;min-height:0}
 #studyPane figure svg{width:100%;flex:1;min-height:0}
+#studyGrid figure{user-select:none;min-width:0}
+#studyGrid figure.masked svg{visibility:hidden}
+#studyGrid figure.masked figcaption::after{content:"（ダブルクリックで再表示）"}
 #studyGrid{display:grid;height:100%;grid-template:1fr 1fr / 1fr 1fr}
 #studyPane .a4{display:block;width:100%;height:auto}
 #stage .viewbar{z-index:4;right:8px}
@@ -3403,6 +3406,30 @@ function showWork(){
     `<span class="tag" style="background:#efe6d6">${L.why[0]}</span>`;
 }
 
+const studyZoom=new Map(), maskedViews=new Set();
+function studyViewBox(key){
+  const zoom=studyZoom.get(key)||1, width=150/zoom, height=100/zoom;
+  return [75-width/2,50-height/2,width,height].join(' ');
+}
+const studyPane=$('studyPane');
+studyPane.addEventListener('wheel',event=>{
+  const figure=event.target.closest('figure[data-view]');
+  if(!figure || !event.deltaY)return;
+  event.preventDefault();
+  const key=figure.dataset.view;
+  if(maskedViews.has(key))return;
+  const units=event.deltaMode===1?16:event.deltaMode===2?figure.clientHeight:1;
+  const step=Math.max(-0.5,Math.min(0.5,event.deltaY*units*0.002));
+  studyZoom.set(key,Math.max(0.25,Math.min(8,(studyZoom.get(key)||1)*Math.exp(-step))));
+  figure.querySelector('svg').setAttribute('viewBox',studyViewBox(key));
+},{passive:false});
+studyPane.addEventListener('dblclick',event=>{
+  const figure=event.target.closest('figure[data-view]');
+  if(!figure)return;
+  const key=figure.dataset.view;
+  if(figure.classList.toggle('masked'))maskedViews.add(key);
+  else maskedViews.delete(key);
+});
 function renderStudy(ps){
   const pane=$('studyPane'), mode=pane.dataset.mode;
   pane.hidden=!mode;
@@ -3423,7 +3450,7 @@ function renderStudy(ps){
     const keys=['top','iso','front','right'];
     const fit=k=>{const b=viewShapes(k,ps).bb;return Math.min(144/b.w,95/b.h);};
     const scale=Math.min(...['top','front','right'].map(fit));
-    pane.innerHTML='<div id="studyGrid">'+keys.map(k=>'<figure><figcaption>'+VIEWS3[k].name+(sizes?'　'+labels[k]+' mm':'')+'</figcaption><svg viewBox="0 0 150 100">'+placeView(k,ps,k==='iso'?fit(k):scale,0,0,150,100).svg+'</svg></figure>').join('')+'</div>';
+    pane.innerHTML='<div id="studyGrid">'+keys.map(k=>'<figure title="スクロールで拡大・縮小、ダブルクリックで表示切替" data-view="'+k+'" class="'+(maskedViews.has(k)?'masked':'')+'"><figcaption>'+VIEWS3[k].name+(sizes?'　'+labels[k]+' mm':'')+'</figcaption><svg viewBox="'+studyViewBox(k)+'">'+placeView(k,ps,k==='iso'?fit(k):scale,0,0,150,100).svg+'</svg></figure>').join('')+'</div>';
   }
 }
 function refresh(){
