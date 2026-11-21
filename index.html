@@ -312,6 +312,9 @@ body.dim main{height:calc(100vh - 42px)}
   .steps .now{animation:step-focus .32s ease-out}
   @keyframes step-focus{from{box-shadow:0 0 0 3px #e9c99b}to{box-shadow:0 0 0 0 transparent}}
 }
+[data-level="green"]{border:3px solid #42764e!important}
+[data-level="yellow"]{border:3px solid #c69d22!important}
+[data-level="orange"]{border:3px solid #d87929!important}
 </style>
 </head>
 <body>
@@ -3624,7 +3627,8 @@ function buildCards(){
   for(const key of order){
     const W=WORKS[key], L=workload(key);
     const c=document.createElement('button'); c.className='card'+(rec.has(key)?' rec':'');
-    c.innerHTML=`<div class="t"><span class="nm">${W.name}</span>
+    if(rec.has(key))c.dataset.level=rec.get(key).level;
+    c.innerHTML=`${rec.has(key)?'<b>'+esc(rec.get(key).label||'おすすめ')+'</b>':''}<div class="t"><span class="nm">${W.name}</span>
         <span class="st">${STAR(L.stars)}</span></div>
       <canvas></canvas>
       ${rec.has(key)?`<div class="rwhy">${esc(rec.get(key).why.slice(0,2).join('／'))}</div>`:''}
@@ -3970,7 +3974,7 @@ $('openFile').onchange=e=>{
       state.hole=d.hole||null; state.handle=!!d.handle; state.handleY=d.handleY??40;
       state.gap=d.gap===10?10:5;state.kSplit=d.work==="K"&&d.kSplit===true;state.bookend=state.kSplit&&d.bookend===true;state.dimStep5=d.dimStep5!==false; state.dims=d.dims||{}; state.comment=d.comment||''; state.who=d.who||'';
       state.scene=SCENES[d.scene]?d.scene:'desk';
-      state.quiz=d.quiz||null; state.reco=d.reco||null;
+      state.quiz=d.quiz||null; state.reco=state.quiz?.done&&state.quiz.ans.length===6?recommend(state.quiz.ans).list:null;
       const ss=$('sceneSel'); if(ss) ss.value=state.scene;
       const wi=$('whoIn'); if(wi) wi.value=state.who;
       state.refs=d.refs||[]; state.nextRef=d.nextRef||1;
@@ -4504,8 +4508,8 @@ const QUIZ=[
   a:['自分のため','家族のため','教室や部活など、みんなで使う']},
  {q:'小学校などで、のこぎりで木を切って 物を作ったことはありますか？',
   a:['何回もある','1〜2回ある','ほとんどない']},
- {q:'説明書を見て、プラモデルや家具を 最後まで組み立てたことはありますか？',
-  a:['ある（とくいなほう）','ある（時間はかかった）','ほとんどない']},
+ {q:'説明書を見て、板を合わせて組み立てることに、自信はありますか？',
+  a:['自信がある','少し自信がある','あまり自信がない']},
 ];
 const QSCENE=['desk','kitchen','floor','desk'];        // Q3の答え → 場面
 /* Q2の答え → 「中に入れてみる」のどれで確かめるか */
@@ -4614,64 +4618,39 @@ function refItem(kind){ const k=REF_KINDS[kind];
   return {label:k.label,w:k.w,d:k.d,h:k.h,mode:k.mode||'in'}; }
 function refCapacity(kind){ return insideSlots(refItem(kind)).length; }
 const UNIT={text:'冊',comic:'冊',bunko:'冊',mag:'冊',sw2:'台',pot:'個',soy:'個',pet:'本',plush:'つ'};
-/* おすすめを計算する。理由も返す */
+/* 用途の候補を先に決める。経験や置き場所で、別用途の作品を混ぜない。 */
+const quizPurposes=[
+  {name:'教科書の整理',works:'CFIJ'},
+  {name:'小さい本の整理',works:'ACF'},
+  {name:'こまごました物の整理',works:'CDGK'},
+  {name:'台所の小物の整理',works:'ADGK'},
+  {name:'大きな紙類の整理',works:'CFJ'},
+  {name:'用途を考え中',works:'ACK'}
+];
+const shapeReason={
+  A:'上下の棚に分けて置く形です。',C:'中央の仕切りで左右に分けて立てられます。',
+  D:'棚と仕切りで置き場所を分ける形です。',E:'天板の下に棚がある形です。',
+  F:'仕切りが3枚あり、種類ごとに並べられます。',G:'前板と取っ手がある箱形です。',
+  I:'棚がある側と、背の高い物を立てる側を使い分けられます。',
+  J:'横長の底板と、向きの違う仕切りがあります。',K:'前後の段に小物を並べる形です。'
+};
+const quizLabels={green:'用途に合う・比較的取り組みやすい',yellow:'用途に合う・難しい工程あり',orange:'用途を変えるなら'};
 function recommend(ans){
-  const ik=QITEM[(ans[1]||1)-1];
-  const it=ik?refItem(ik):null;
-  const place=QSCENE[(ans[2]||1)-1], anyPlace=((ans[2]||1)===4);
-  const forWhom=ans[3]||1;
-  const saw=3-(ans[4]||3), man=3-(ans[5]||3);          // 0〜2
-  const maxStar=Math.min(4, 1.5+saw*0.75+man*0.75);
-  const out=[];
-  for(const key of Object.keys(WORKS)){
-    const ps=WORKS[key].make(defDims(key));
-    const L=workload(key);
-    const bs=ps.map(bbox);
-    const W=Math.max(...bs.map(b=>b.max[0]))-Math.min(...bs.map(b=>b.min[0]));
-    const H=Math.max(...bs.map(b=>b.max[1]));
-    const sideH=H;
-    const cs=compartments(ps);
-    const div=ps.filter(p=>p.posture==='side'&&p.id!=='L'&&p.id!=='R').length;
-    const hasTop=ps.some(p=>p.id==='tp');
-    let sc=0; const why=[];
-    if(it){
-      const n=slotsFor(ps,it).length, K=REF_KINDS[ik], u=UNIT[ik]||'つ';
-      if(n===0){ sc-=5; why.push(`${it.label}は 入りません`); }
-      else if(K.many){
-        /* 本のように何冊も持っている物は「何冊入るか」が うれしい情報。
-           ただし「32冊まで」は現実ばなれしているので、10冊で言い方を打ち切る */
-        if(n>=10){ sc+=4.5; why.push(`${it.label}が 10${u}以上 入ります`); }
-        else if(n>=3){ sc+=4; why.push(`${it.label}が ${n}${u}入ります`); }
-        else { sc+=2.5; why.push(`${it.label}は ${n}${u}だけ入ります`); }
-      }else{
-        /* ふつう1〜数個しか持っていない物。「14台入ります」は言わない */
-        const m=Math.min(n,K.few);
-        sc += (n>=K.few) ? 4.5 : 3;
-        why.push(m>=2 ? `${it.label}が ${m}${u}ならべて置けます` : K.ok);
-      }
-      if(n>0 && it.mode==='stand' && it.d>160)
-        why.push('大きい本は 前に少しはみ出します');
-    }
-    if(ans[1]===3||ans[1]===4){                         // こまごました物・台所の小物
-      if(div>=2){ sc+=3; why.push(`仕切りが${div}枚あって 分けられます`); }
-      else if(div===1){ sc+=2; why.push('仕切りで2つに分けられます'); }
-    }
-    if(!anyPlace){
-      if(place==='desk'){ if(H<=400){ sc+=2; why.push('つくえの上だなの下に入る高さ'); }
-        if(W<=300) sc+=1; }
-      if(place==='kitchen'){ if(W<=300) sc+=1;
-        if(!hasTop){ sc+=1; why.push('手を入れる穴を つけられます（持ち運びやすくなります）'); } }
-      if(place==='floor'){ if(W>=280){ sc+=2; why.push('ゆかに置いても さまになる大きさ'); }
-        if(H>=200) sc+=1; }
-    }
-    if(forWhom>=2 && !hasTop) sc+=1;
-    if(L.stars<=maxStar){ sc+=3; why.push(`いまの経験なら 作りきれます（★${L.stars}）`); }
-    else if(L.stars<=maxStar+0.5) sc+=0;
-    else { sc-=3; why.push(`★${L.stars}。先生の助けがたくさん要ります`); }
-    out.push({key, sc, stars:L.stars, why});
+  const purpose=quizPurposes[ans[1]-1]||quizPurposes[5], undecided=purpose===quizPurposes[5];
+  const maxStar=Math.min(4,2+(3-ans[4])*0.5+(3-ans[5])*0.5);
+  function card(key,alternative=false){
+    const build=assembly(WORKS[key].make(defDims(key)));
+    const stars=build.stars,level=alternative?'orange':stars<=maxStar?'green':'yellow';
+    const easiest=purpose===quizPurposes[0]&&key==='C';
+    const fit=alternative?`${purpose.name}向けの候補からは外れますが、入れる物を変えてもよければ検討できます。`:shapeReason[key];
+    const challenge=key==='I'?'棚板を仕切板の横に合わせて留める工程があります':build.why[0];
+    const difficulty=level==='yellow'?`${challenge}。先生や友達に支えてもらう場面がありそうです。挑戦してみますか？`:
+      easiest?'教科書向きの4作品の中で、いちばん組み立てやすい作品です。':`組み立ての目安は★${stars}。${build.why[0]}。`;
+    return {key,stars,level,label:undecided&&!alternative?(level==='green'?'作りやすさから選ぶ':'難しい工程あり'):quizLabels[level],why:[fit,difficulty]};
   }
-  out.sort((a,b)=>b.sc-a.sc || a.stars-b.stars);
-  return {list:out, maxStar, place, anyPlace, item:it};
+  const list=[...purpose.works].map(k=>card(k)).sort((a,b)=>a.stars-b.stars);
+  const alternatives=ans[4]+ans[5]>=5&&!undecided?[...'AE'].filter(k=>!purpose.works.includes(k)).map(k=>card(k,true)):[];
+  return {list,alternatives,purpose,place:QSCENE[ans[2]-1],anyPlace:ans[2]===4};
 }
 function quizCode(ans){ return ans.map(v=>v||1).join(''); }
 
@@ -4709,22 +4688,22 @@ function drawQuiz(){
 function finishQuiz(){
   const r=recommend(state.quiz.ans);
   state.quiz.code=quizCode(state.quiz.ans);
-  state.reco=r.list.slice(0,3).map(x=>({key:x.key,why:x.why,sc:x.sc}));
+  state.reco=r.list;
   state.scene=r.place;
   const ss=$('sceneSel'); if(ss) ss.value=state.scene;
 }
 function drawQuizResult(){
   const r=recommend(state.quiz.ans), box=$('qBody');
-  const top=r.list.slice(0,3);
+  const top=r.list;
   let h=`<div class="qprog">そうだんの けっか</div>
    <div class="qcodeout">あなたは <b>${state.quiz.code}</b> タイプでした
      <span>この番号をひかえておくと、次に開いたとき すぐ同じ結果が出せます</span></div>
-   <p class="qlead">あなたの答えから、<b>向いていそうな作品</b>をえらびました。
-     これは <b>おすすめの候補</b>です。ちがう作品を選んでもかまいません。</p>
+   <p class="qlead"><b>${r.purpose.name}</b>を選んだあなたへ。形と組み立てやすさで比べてみましょう。
+     自分の持ち物が収まるかは、大きさを測って②3Dで確かめましょう。</p>
    <div class="qcards">`;
   for(const x of top){
     const W=WORKS[x.key], d=defDims(x.key);
-    h+=`<div class="qcard"><div class="t">${W.name}
+    h+=`<div class="qcard" data-level="${x.level}"><b>${x.label}</b><div class="t">${W.name}
       <span class="st">${STAR(workload(x.key).stars)}</span></div>
       <canvas data-mini="${x.key}"></canvas>
       <div class="mm">${d.W}×${W.D}×${d.H}mm</div>
@@ -4732,18 +4711,12 @@ function drawQuizResult(){
       <button data-go="${x.key}">この作品でつくる</button></div>`;
   }
   h+='</div>';
-  /* おすすめ以外の7つも、同じ画面に出す（3つしか見ないで決めてしまわないように） */
-  const rest=r.list.slice(3);
-  h+=`<p class="qlead2">おすすめ以外の${rest.length}つも ここにあります。
-      <b>気になったら こちらを選んでもかまいません。</b></p><div class="qrest">`;
-  for(const x of rest){
-    const W=WORKS[x.key], d=defDims(x.key);
-    h+=`<button class="rcard" data-go="${x.key}"><div class="t">${W.name}
-      <span class="st">${STAR(workload(x.key).stars)}</span></div>
-      <canvas data-mini="${x.key}"></canvas>
-      <div class="mm">${d.W}×${W.D}×${d.H}mm</div>
-      <div class="rw">${esc(x.why[0]||'')}</div></button>`;
+  if(r.alternatives.length){
+    h+='<details><summary>用途を変えて、もっと簡単な作品も見る</summary><div class="qrest">';
+    for(const x of r.alternatives)h+=`<button class="rcard" data-level="orange" data-go="${x.key}"><b>${x.label}：${WORKS[x.key].name}</b><br>${esc(x.why.join(' '))}</button>`;
+    h+='</div></details>';
   }
+  h+='<div><button id="allQuizWorks">全作品から選ぶ</button>';
   h+=`</div><div class="qrow"><button id="qAgain">もう一度 そうだんする</button>
     <span class="grow"></span></div>
     <p class="note">${r.anyPlace
@@ -4753,6 +4726,7 @@ function drawQuizResult(){
   box.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ selectWithGap(b.dataset.go); });
   box.querySelectorAll('[data-mini]').forEach(c=>
     requestAnimationFrame(()=>miniDraw(c,c.dataset.mini)));
+  $('allQuizWorks').onclick=()=>goScreen('pick');
   $('qAgain').onclick=()=>startQuiz();
 }
 
