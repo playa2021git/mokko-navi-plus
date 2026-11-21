@@ -352,7 +352,7 @@ body.dim main{height:calc(100vh - 42px)}
     <section class="acc open"><h2>板の一覧（クリックで選ぶ）</h2>
       <div class="accb"><div class="plist" id="parts"></div></div></section>
     <section class="acc open"><h2>大きさをかえる</h2>
-      <div class="accb"><div id="size3"></div></div></section>
+      <div class="accb"><div id="size3"></div><div id="mountControl" hidden><label><span id="mountLabel"></span> <output id="mountValue"></output><input id="mountRange" type="range" step="0.5"></label><small id="mountNote" role="status"></small></div></div></section>
   </aside>
 
   <section id="stage">
@@ -2062,27 +2062,17 @@ if(HAS3D){
     refresh();
   }
 
-  function startMove(e,kind,id){
-    const rf=kind==='ref'?state.refs.find(r=>r.id===id):null;
-    const pp=kind==='part'?parts().find(x=>x.id===id):null;
-    const y=rf?rf.pos[1]:(pp?pp.pos[1]:0);
-    return {mode:'move',kind,id,up:e.shiftKey,planeY:y,from:onPlane(e,y),sy:e.clientY,
-            base: rf?[...rf.pos]:[...(state.off[id]||[0,0,0])]};
-  }
   renderer.domElement.addEventListener('pointerdown',e=>{
+    if(e.button!==0)return;
     renderer.domElement.setPointerCapture(e.pointerId);
     const h=hitObj(e);
     if(h && h.kind==='hole'){ drag={mode:'hole',which:h.which}; moveHole(e,h.which); return; }
-    if(e.button===2){                                  /* 右ドラッグでも動かせる（おまけ） */
-      if(h){ state.sel=h.id; state.selKind=h.kind; refresh(); }
-      if(state.sel) drag=startMove(e,state.selKind,state.sel);
-      return;
-    }
     /* 普通の左ボタン：入れたモノの上をつかんだら、そのモノを動かす。
        それ以外（板や空白）は視点をまわす。 */
     if(h && h.kind==='ref'){
       if(state.sel!==h.id||state.selKind!=='ref'){ state.sel=h.id; state.selKind='ref'; refresh(); }
-      drag=startMove(e,'ref',h.id);
+      const rf=state.refs.find(r=>r.id===h.id);
+      drag={mode:'move',id:h.id,up:e.shiftKey,planeY:rf.pos[1],from:onPlane(e,rf.pos[1]),sy:e.clientY,base:[...rf.pos]};
       return;
     }
     drag={mode:'orbit',x:e.clientX,y:e.clientY,yaw:orbit.yaw,pitch:orbit.pitch,moved:false,hit:h};
@@ -2097,11 +2087,9 @@ if(HAS3D){
       orbit.pitch=Math.max(-1.45,Math.min(1.45,drag.pitch+dy*0.006)); return;
     }
     /* ドラッグのとちゅうで Shift を押しても上下に切りかわるようにする */
+    const rf=state.refs.find(r=>r.id===drag.id);if(!rf)return;
     if(e.shiftKey!==drag.up){
-      const cur = drag.kind==='ref' ? state.refs.find(r=>r.id===drag.id).pos
-                                    : (state.off[drag.id]||[0,0,0]);
-      const yNow = drag.kind==='ref' ? cur[1]
-                 : (parts().find(x=>x.id===drag.id)||{pos:[0,0,0]}).pos[1];
+      const cur=rf.pos,yNow=cur[1];
       drag.up=e.shiftKey; drag.base=[...cur]; drag.sy=e.clientY;
       drag.planeY=yNow; drag.from=onPlane(e,yNow);
     }
@@ -2109,9 +2097,7 @@ if(HAS3D){
     if(drag.up) d=[0,sn(-(e.clientY-drag.sy)*(orbit.dist/800)*1.2),0];
     else{ const n=onPlane(e,drag.planeY);
       if(!n||!drag.from) return; d=[sn(n[0]-drag.from[0]),0,sn(n[2]-drag.from[2])]; }
-    if(drag.kind==='ref'){ const rf=state.refs.find(r=>r.id===drag.id); if(!rf)return;
-      rf.pos=drag.base.map((v,i)=>v+d[i]); rf.pos[1]=Math.max(rf.h/2,rf.pos[1]); rf.inside=false; }
-    else state.off[drag.id]=drag.base.map((v,i)=>v+d[i]);
+    rf.pos=drag.base.map((v,i)=>v+d[i]); rf.pos[1]=Math.max(rf.h/2,rf.pos[1]); rf.inside=false;
     refresh();
   });
   renderer.domElement.addEventListener('pointerup',e=>{
@@ -2943,7 +2929,7 @@ function buildParts(ps){
     b.onclick=()=>focusParts([p.id]);
     list.appendChild(b);
   }
-  buildDims();
+  buildDims();updateMountControl();
 
   const sel=(state.selKind==='part'&&ps.find(p=>p.id===state.sel))||ps[0];
   state.sel=state.selKind==='part'?sel.id:state.sel;
@@ -3372,6 +3358,39 @@ function makeDimDOM(){
         '<p>材料A・Bの部品を入れ替えるか、高さ・外はばを調整してください。現在の設計は保持しました。</p>','戻る',null);
     }else{state.warned=false;nestMessage='';}
     refresh();
+  };
+}
+function updateMountControl(){
+  const ps=parts(),p=ps.find(q=>q.id===state.sel),box=$('mountControl');
+  const divider=p?.name.startsWith('仕切板');
+  box.hidden=state.selKind!=='part'||!p||(!divider&&p.role!=='back')||
+    (divider&&WORKS[state.work].dims.some(t=>t.k==='dv'));
+  if(box.hidden)return; // G・Iは棚幅なども連動する既存の寸法スライダーを使う。
+  const axis=p.role==='back'?1:p.posture==='front'?2:0;
+  const origin=[-dimsOf().W/2,0,-75][axis],bounds=bbox(p);
+  const position=bounds.min[axis]-origin,range=$('mountRange');
+  let low=axis===0?T:0,high=[dimsOf().W-T,dimsOf().H,150][axis]-(bounds.max[axis]-bounds.min[axis]);
+  for(const q of ps){
+    if(q===p||q.posture!==p.posture)continue;
+    const b=bbox(q);
+    if(![0,1,2].every(i=>i===axis||Math.min(b.max[i],bounds.max[i])>Math.max(b.min[i],bounds.min[i])))continue;
+    if(b.max[axis]<=bounds.min[axis])low=Math.max(low,b.max[axis]-origin);
+    if(b.min[axis]>=bounds.max[axis])high=Math.min(high,b.min[axis]-origin-(bounds.max[axis]-bounds.min[axis]));
+  }
+  const fixed=state.work==='J'&&p.id==='dA';
+  range.min=Math.min(position,low);range.max=Math.max(position,high);range.value=position;
+  range.disabled=fixed||high<=low;
+  $('mountLabel').textContent=p.label+'の取り付け'+['位置（作品の左端から板の左面まで）','高さ（地から板の下端まで）','位置（側板の奥端から板の奥面まで）'][axis];
+  $('mountValue').textContent=mm(position)+' mm';
+  $('mountNote').textContent=fixed?'右側の区画幅は仕切板Bの板幅で決まります。':'';
+  range.oninput=()=>{
+    const old=state.off[p.id],next=[...(old||[0,0,0])];
+    next[axis]+=Number(range.value)-position;
+    if(next.some(v=>v!==0))state.off[p.id]=next;else delete state.off[p.id];
+    const moved=parts(),invalid=overlappingParts(moved).length||constructionIssues(moved).length||nailSpots(moved,true).some(n=>!n.valid);
+    if(invalid){if(old)state.off[p.id]=old;else delete state.off[p.id];}
+    refresh();
+    if(invalid)$('mountNote').textContent='この位置では板または釘が正しく接合できません。';
   };
 }
 function buildDims(){

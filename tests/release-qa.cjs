@@ -47,7 +47,9 @@ const assert=require('node:assert/strict'),path=require('node:path'),fs=require(
   await select('A');await page.locator('[data-part-id="L"]').click();await page.waitForTimeout(150);
   const cv=await page.locator('#stage canvas:not(#dimCv)').boundingBox(),x=cv.x+cv.width-80,y=cv.y+150;
   await page.keyboard.down('Shift');await page.mouse.move(x,y);await page.mouse.down({button:'right'});await page.mouse.move(x,y-100,{steps:10});await page.mouse.up({button:'right'});await page.keyboard.up('Shift');
-  assert((await page.evaluate(()=>state.off.L[1]))>0);assert.match(await page.locator('#msgs').textContent(),/接合が外れ/);
+  assert.equal(await page.evaluate(()=>state.off.L),undefined);
+  // Previously saved offsets still receive full construction validation.
+  await page.evaluate(()=>{state.off.L=[0,100,0];refresh();});assert.match(await page.locator('#msgs').textContent(),/接合が外れ/);
   assert.equal(await page.evaluate(()=>outer().H),await page.evaluate(()=>{const bs=parts().map(bbox);return Math.max(...bs.map(b=>b.max[1]))-Math.min(...bs.map(b=>b.min[1]));}));await assertBlocked();
   // A 0.5mm gap must not be accepted merely because the nail-contact search has a tolerance.
   await select('A');await page.evaluate(()=>{state.off.L=[-.5,0,0];refresh();});assert.match(await page.locator('#msgs').textContent(),/0\.5mmの隙間/);
