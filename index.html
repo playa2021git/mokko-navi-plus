@@ -3378,14 +3378,18 @@ function updateMountControl(){
     if(b.min[axis]>=bounds.max[axis])high=Math.min(high,b.min[axis]-origin-(bounds.max[axis]-bounds.min[axis]));
   }
   const fixed=state.work==='J'&&p.id==='dA';
-  range.min=Math.min(position,low);range.max=Math.max(position,high);range.value=position;
+  // 説明書と同じ、底板上でメジャーを当てる端をスライダーの基準にする。
+  const datum=divider?dividerAssemblyDims(ps).find(d=>d.part.id===p.id):null;
+  const reading=datum?datum.distance:position,sign=axis===2?-1:1;
+  const limits=[low,high].map(v=>reading+sign*(v-position));
+  range.min=Math.min(reading,...limits);range.max=Math.max(reading,...limits);range.value=reading;
   range.disabled=fixed||high<=low;
-  $('mountLabel').textContent=p.label+'の取り付け'+['位置（作品の左端から板の左面まで）','高さ（地から板の下端まで）','位置（側板の奥端から板の奥面まで）'][axis];
-  $('mountValue').textContent=mm(position)+' mm';
+  $('mountLabel').textContent=p.label+'の取り付け'+(datum?`位置（${datum.base.label}の${datum.edge}から板の${datum.face}まで）`:'高さ（地から板の下端まで）');
+  $('mountValue').textContent=mm(reading)+' mm';
   $('mountNote').textContent=fixed?'右側の区画幅は仕切板Bの板幅で決まります。':'';
   range.oninput=()=>{
     const old=state.off[p.id],next=[...(old||[0,0,0])];
-    next[axis]+=Number(range.value)-position;
+    next[axis]+=sign*(Number(range.value)-reading);
     if(next.some(v=>v!==0))state.off[p.id]=next;else delete state.off[p.id];
     const moved=parts(),invalid=overlappingParts(moved).length||constructionIssues(moved).length||nailSpots(moved,true).some(n=>!n.valid);
     if(invalid){if(old)state.off[p.id]=old;else delete state.off[p.id];}
