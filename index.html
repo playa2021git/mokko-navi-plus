@@ -166,7 +166,7 @@ header .about{font-size:11px;color:var(--sub);text-decoration:underline;cursor:p
   background:none;border:none;padding:2px 4px}
 
 /* ---------- そうだん画面 ---------- */
-#quiz{position:fixed;inset:0;z-index:25;background:var(--bg);overflow:auto;padding:16px 22px 28px}
+#quiz{position:fixed;inset:42px 0 0;z-index:25;background:var(--bg);overflow:auto;padding:16px 22px 28px}
 #quiz .qhead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 #quiz h2{font-size:17px;color:#3f3225;letter-spacing:0;margin:0}
 #qBody{max-width:1000px;margin:0 auto}
@@ -254,7 +254,7 @@ svg.a4{width:min(820px,100%);height:auto;flex-shrink:0;display:block;background:
 .dfoot{flex:0 0 auto;padding:7px 14px;font-size:11.5px;color:var(--sub);line-height:1.6;
   border-top:1px solid var(--line);background:var(--panel)}
 .dfoot b{color:var(--ink)}
-#picker{position:fixed;inset:0;background:var(--bg);z-index:20;
+#picker{position:fixed;inset:42px 0 0;background:var(--bg);z-index:20;
   display:flex;flex-direction:column;padding:14px 18px;overflow:auto}
 #picker h3{margin:0;font-size:17px;letter-spacing:.04em}
 #picker .lead{color:#4b423a;font-size:17px;margin:8px 0 0;max-width:70ch;line-height:1.65}
@@ -308,6 +308,10 @@ body.dim main{height:calc(100vh - 42px)}
 #studyGrid{display:grid;height:100%;grid-template:1fr 1fr / 1fr 1fr}
 #studyPane .a4{display:block;width:100%;height:auto}
 #stage .viewbar{z-index:4;right:8px}
+@media screen and (prefers-reduced-motion:no-preference){
+  .steps .now{animation:step-focus .32s ease-out}
+  @keyframes step-focus{from{box-shadow:0 0 0 3px #e9c99b}to{box-shadow:0 0 0 0 transparent}}
+}
 </style>
 </head>
 <body>
@@ -403,7 +407,7 @@ body.dim main{height:calc(100vh - 42px)}
 <div id="draw" hidden>
   <div class="dhead">
     <b>けがき ― 材料に線を引こう</b><span id="dsub" class="note" style="margin:0"></span>
-    <span class="grow"></span><span class="steps" id="dSteps"></span>
+    <span class="grow"></span>
     <span class="spacer"></span>
     <button id="dNail">釘を見る</button>
     <button id="dZoomOut" hidden>材料ぜんぶに戻す</button>
@@ -473,7 +477,7 @@ body.dim main{height:calc(100vh - 42px)}
 
 <div id="quiz" hidden>
   <div class="qhead"><h2>そうだん ― 何のために作るのかを決めよう</h2>
-    <span class="grow"></span><span class="steps" id="qSteps"></span>
+    <span class="grow"></span>
     <button class="about" id="aboutBtn2">このソフトについて</button></div>
   <div id="qBody"></div>
 </div>
@@ -481,7 +485,7 @@ body.dim main{height:calc(100vh - 42px)}
 <div id="view" class="paper" hidden>
   <div class="pbar"><b>見た目図 ― 形を読みとる</b>
     <span class="grow"></span>
-    <span class="steps" id="vSteps"></span>
+
     <button id="vPrint">印刷する</button></div>
   <div class="pbody" id="vBody"></div>
 </div>
@@ -489,7 +493,7 @@ body.dim main{height:calc(100vh - 42px)}
 <div id="sheet" class="paper" hidden>
   <div class="pbar"><b>製作の手引き ― 教材の説明書と合わせて確認</b>
     <span class="grow"></span>
-    <span class="steps" id="sSteps"></span>
+
     <label style="font-size:12px">名前
       <input id="whoIn" type="text" maxlength="40" placeholder="1年1組1番 ○○" style="width:150px"></label>
     <button id="sPrint">印刷する</button></div>
@@ -504,6 +508,12 @@ body.dim main{height:calc(100vh - 42px)}
     <button id="mYes" class="on">このまま進む</button></div>
 </div></div>
 
+<dialog id="gapDialog" aria-labelledby="gapTitle">
+  <h3 id="gapTitle">板と板の間の切りしろを選ぶ</h3>
+  <p id="gapReason"></p>
+  <button id="gap5">5 mm</button> <button id="gap10">10 mm</button>
+  <button id="gapBack">作品選びに戻る</button>
+</dialog>
 <div id="picker">
   <button id="pClose" hidden>閉じる</button>
   <h3>作る作品を選ぼう</h3>
@@ -727,14 +737,14 @@ J:{ name:'作品例J', manual:3, D:162,
 
 K:{name:'近藤オリジナルK', original:true, manual:0, D:162,
   desc:'上段60mm・下段150mmの2段ディスプレイ台。側板2枚を共通材から糸のこで切り分ける。',
-  dims:[{k:'W',label:'外はば',min:350,max:600,step:2,def:500},
+  dims:[{k:'W',label:'外はば',min:350,max:624,step:2,def:500},
         {k:'H',label:'高さ',min:120,max:250,step:10,def:180}],
   make(d){
     const x=(d.W-T)/2, iw=d.W-2*T, blank=d.H*1.5+KERF;
     const profile=[[0,0],[150,0],[150,d.H],[75+KERF/2,d.H],[75+KERF/2,d.H/2],[0,d.H/2]];
     const sides=[side('L','左側板',d.H,-x),side('R','右側板',d.H,x)].map((p,i)=>({...p,
-      profile,nestKey:'K-sides',nestLen:blank,nestBw:150,nestLabel:'段付き側板2枚（共通材）',
-      stockReverse:!!i,stockCrossReverse:!!i,process:'zigzag'}));
+      profile,nestKey:'K-sides',nestLen:state.work==='K'&&state.kSplit?600:blank,nestBw:150,nestLabel:'段付き側板2枚（共通材）',
+      stockReverse:!!i,stockCrossReverse:!!i,process:state.work==='K'&&state.kSplit?'split':'zigzag'}));
     return [...sides,flat('bo','下段展示板',iw,30),
       {...flat('sh','上段展示板',iw,d.H-30),h:60,bw:60,pos:[0,d.H-36,-45]}];
   }},
@@ -792,7 +802,7 @@ const state={ work:'A', corners:{}, off:{}, refs:[], nextRef:1, sel:null, selKin
   quiz:null, reco:null, refFull:null, // そうだんの答え・おすすめ作品・入りきらなかった物
   warned:false,        // 「材料の右はしが余っている」に一度OKしたか
   who:'',              // 名前（説明書に印刷する）
-  dimStep5:true,        // 生徒が解除すると1mm単位
+  gap:5,kSplit:false,bookend:false,dimStep5:true,        // 生徒が解除すると1mm単位
   dims:{},             // スライダーで変えた寸法（作品を選びなおすとまっさら）
   comment:'',          // オリジナル寸法にした理由（けがきへ行く前に必要）
   hole:null,           // ケーブルの穴 {id:板のid, x:板の左端からの中心位置mm}（作品に1つ）
@@ -891,7 +901,7 @@ function hitBox(a,b,t=0.6){ return [0,1,2].every(i=>a.min[i]<b.max[i]-t && b.min
    5) 材料取り（600mmの棒を切り分けるだけ）
    ========================================================= */
 function nest(ps,useLayout=true){
-  const assigned=useLayout?state.nestBoard:{},positions=useLayout?state.nestX:{};
+  const assigned=ps.some(p=>p.process==="split")?{bo:"A",L:"B",sh:"C"}:useLayout?state.nestBoard:{},positions=useLayout?state.nestX:{};
   const boards=STOCK.map(s=>({...s,placed:[],cursor:0}));
   /* nestKey が同じ部品は、1枚の切れ端から取る（取っ手など） */
   const seen=new Set(), items=[];
@@ -907,7 +917,7 @@ function nest(ps,useLayout=true){
     for(const bd of boards){
       if(assigned[it.id] && assigned[it.id]!==bd.id) continue;
       if(bd.h!==it.bw) continue;
-      const x = bd.cursor ? bd.cursor+KERF : 0;
+      const x = bd.cursor ? bd.cursor+state.gap : 0;
       if(x+it.len > bd.w) continue;
       bd.placed.push({...it,x}); bd.cursor=x+it.len; return true;
     }
@@ -924,7 +934,7 @@ function nest(ps,useLayout=true){
       for(let j=0;j<boards.length;j++){
         const b=boards[j];if(assigned[it.id] && assigned[it.id]!==b.id)continue;
         if(b.h!==it.bw||(!Object.keys(assigned).length&&tried.has(used[j])))continue;
-        tried.add(used[j]);const before=used[j],x=before?before+KERF:0;
+        tried.add(used[j]);const before=used[j],x=before?before+state.gap:0;
         if(x+it.len>b.w)continue;
         used[j]=x+it.len;assignment[i]={j,x};
         if(search(i+1))return true;used[j]=before;
@@ -948,11 +958,11 @@ function nest(ps,useLayout=true){
     bd.placed.sort((a,b)=>a.x-b.x);
     let edge=bd.w;
     for(let i=bd.placed.length-1;i>=0;i--){
-      const q=bd.placed[i];q.x=Math.min(q.x,edge-q.len);edge=q.x-KERF;
+      const q=bd.placed[i];q.x=Math.min(q.x,edge-q.len);edge=q.x-state.gap;
     }
     let cursor=0;
     for(const q of bd.placed){
-      q.x=Math.max(cursor,q.x);cursor=q.x+q.len+KERF;
+      q.x=Math.max(cursor,q.x);cursor=q.x+q.len+state.gap;
       q.endS=q.x<=0.5;q.endE=q.x+q.len>=bd.w-0.5;
     }
     /* 余り（すき間）を全部拾う */
@@ -969,14 +979,15 @@ function nestRange(ps,id){
   for(const bd of boards){
     const i=bd.placed.findIndex(q=>q.id===id||(q.members||[]).includes(id)); if(i<0) continue;
     const q=bd.placed[i], prev=bd.placed[i-1], next=bd.placed[i+1];
-    return {bd, q, lo: prev?prev.x+prev.len+KERF:0,
-                 hi:(next?next.x-KERF:bd.w)-q.len};
+    return {bd, q, lo: prev?prev.x+prev.len+state.gap:0,
+                 hi:(next?next.x-state.gap:bd.w)-q.len};
   }
   return null;
 }
 
 /* 材料間の移動・交換。完成品の形は変えず、共通材はまとめて動かす。 */
 function moveStockPart(id,boardId,x=0,swapId=null){
+  if(state.work==='K'&&state.kSplit)return false;
   const ps=parts(),source=nestRange(ps,id),target=STOCK.find(b=>b.id===boardId);
   if(!source||!target||source.q.bw!==target.h)return false;
   const other=swapId?nestRange(ps,swapId):null;
@@ -1060,7 +1071,7 @@ function factoryEnds(ps){
     if(q.process){
       for(const id of q.members){const p=ps.find(p=>p.id===id);
         const reversed=!!p.stockReverse;
-        m.set(id,{s:reversed?e.e:e.s,e:q.process==='zigzag'?false:e.e});
+        m.set(id,{s:reversed?e.e:e.s,e:['zigzag','split'].includes(q.process)?false:e.e});
       }
     }else for(const id of q.members||[q.id])m.set(id,{...e});
   }
@@ -1403,10 +1414,10 @@ function assembly(ps){
 function workload(key){
   const ps=(key===state.work)?parts():baseParts(key);
   const {boards,left}=nest(ps,key===state.work);
-  const cuts=boards.reduce((n,b)=>n+b.placed.reduce((n,q,i)=>n+(q.endS?0:((i>0&&Math.abs(q.x-(b.placed[i-1].x+b.placed[i-1].len)-KERF)<0.01)?0:1))+(q.endE?0:1),0),0);       // 切り分ける回数
+  const cuts=boards.reduce((n,b)=>n+b.placed.reduce((n,q,i)=>n+(q.endS?0:((i>0&&Math.abs(q.x-(b.placed[i-1].x+b.placed[i-1].len)-state.gap)<0.01)?0:1))+(q.endE?0:1),0),0);       // 切り分ける回数
   const corners=ps.reduce((n,p)=>n+(p.corners||p.c).filter(c=>c.type!=='none').length,0);
   const as=assembly(ps);
-  const processCuts=boards.reduce((n,b)=>n+b.placed.reduce((t,q)=>t+(q.process==='zigzag'?1:q.process==='rip'?2:0),0),0);
+  const processCuts=boards.reduce((n,b)=>n+b.placed.reduce((t,q)=>t+(q.process==='zigzag'?1:['rip','split'].includes(q.process)?2:0),0),0);
   return {pieces:ps.length, cuts:cuts+processCuts, corners, nails:nailSpots(ps).length,
           left:left.length, stars:as.stars, why:as.why};
 }
@@ -2275,6 +2286,10 @@ function processLines(ps,q){
   if(q.process==='zigzag'){
     const p=stockMembers(ps,q)[0], a=p.h/2+KERF/2,b=p.h+KERF/2;
     lines=[[[a,0],[a,75],[b,75],[b,150]]];
+  }else if(q.process==='split'){
+    const h=stockMembers(ps,q)[0].h;
+    const path=[[h/2+KERF/2,0],[h/2+KERF/2,75],[h+KERF/2,75],[h+KERF/2,150]];
+    lines=[path,path.map(([x,y])=>[q.len-x,150-y])];
   }else if(q.process==='rip')lines=[[[0,60+KERF/2],[q.len,60+KERF/2]],[[0,120+KERF*1.5],[q.len,120+KERF*1.5]]];
   return stockFlip(q)?lines.map(line=>line.map(([a,b])=>[q.len-a,b])):lines;
 }
@@ -2306,6 +2321,10 @@ function processNotes(ps=parts()){
   const grouped=nest(ps).boards.flatMap(b=>b.placed.filter(q=>q.process).map(q=>({b,q})));
   if(state.work==='L')return ['縦びきなし。前後補強板は60mm幅材から各'+mm(dimsOf().W-2*T)+'mmを横切りする。','足板は各100×150mm。木目を左右方向にし、脚を足板の前後・左右の中心に合わせる。'];
   return grouped.flatMap(({b,q})=>{
+    if(q.process==='split'){
+      const h=stockMembers(ps,q)[0].h,core=600-2*(h+KERF);
+      return [`材料Bの両端から段付き側板を取る。中央端材の全幅150mm、段差${mm(h/2)}mm、全幅が残る中央区間${mm(core)}mm（加工代各5mm）。`];
+    }
     if(q.process==='zigzag'){
       const p=stockMembers(ps,q)[0],a=p.h/2+KERF/2,c=p.h+KERF/2;
       return [`材料${b.id}：幅150×長さ${mm(q.len)}の共通材から段付き側板2枚。`,
@@ -2340,7 +2359,7 @@ function manufacturingSheet(ps){
       body+=`<rect x="${x}" y="${oy}" width="${q.len*sx}" height="${b.h*sy}" fill="#e8d7b4" stroke="#6b5233" stroke-width=".25"/>`;
       body+=sharedBlankSvg(ps,q,x,oy,sx,sy);
       body+=`<text x="${x+q.len*sx/2}" y="${oy+b.h*sy+5}" font-size="3" text-anchor="middle">${mm(q.x)}〜${mm(q.x+q.len)} / 長さ${mm(q.len)}</text>`;
-      if(!q.endE)body+=`<rect x="${x+q.len*sx}" y="${oy}" width="${KERF*sx}" height="${b.h*sy}" fill="#c46c61"/>`;
+      if(!q.endE)body+=`<rect x="${x+q.len*sx}" y="${oy}" width="${state.gap*sx}" height="${b.h*sy}" fill="#c46c61"/>`;
     }
     const labels=b.placed.map(q=>q.label).join(' ／ ');
     body+=`<text x="20" y="${oy+b.h*sy+11}" font-size="3">${esc(labels)}</text>`;
@@ -2443,8 +2462,8 @@ function drawNest(){
       else if(pw>26){ g.fillStyle=sel?'#fff':'#3f3225'; g.fillText(`${mm(q.len)}`,x+2,oy+bh/2+4); }
       /* のこぎりの通り道（材料の端でない側にできる） */
       g.fillStyle='rgba(176,70,60,.30)';
-      if(!q.endS) g.fillRect(x-KERF*sc,oy,KERF*sc,bh);
-      if(!q.endE) g.fillRect(x+pw,oy,KERF*sc,bh);
+      if(!q.endS) g.fillRect(x-state.gap*sc,oy,state.gap*sc,bh);
+      if(!q.endE) g.fillRect(x+pw,oy,state.gap*sc,bh);
       /* 製材所が切った端 */
       if(state.showEnds){
         g.fillStyle='#00c853';
@@ -2481,7 +2500,7 @@ function drawNest(){
     ? `／ 取れない板：${left.map(i=>i.label).join('・')}`
     : (state.showEnds
         ? `／ <span style="color:#00a344">緑＝製材所が切った端</span>・左右で位置調整、A/Bの行をまたいで移動・交換できます`
-        : `／ 左右で位置調整・A/Bの行をまたいで移動・部品の上で交換（切りしろ ${KERF}mm）`))
+        : `／ 左右で位置調整・A/Bの行をまたいで移動・部品の上で交換（切りしろ ${state.gap}mm）`))
     + (boards.some(b=>b.placed.length&&b.placed.at(-1).x+b.placed.at(-1).len<b.w-.5)?'<br>材料の右端にも、製材所で切られた面があります。部品を移動して活用できないか考えてみよう。接合や接地に適した場所で使えるかを考え、使わない選択もできます。':'')
     + ps.map(p=>{const target=supportedFlipCandidate(ps,p.id);return target?'<br><span style="color:#b0463c">'+esc(p.label)+'：製材所の端が'+target.from+'側です。</span> <button data-end-flip="'+p.id+'"'+(target.floor?' data-floor-flip="'+p.id+'"':'')+'>'+target.label+'</button>':'';}).join('')
     + (nestMessage?'<br><b role="status">'+esc(nestMessage)+'</b>':'')
@@ -2733,15 +2752,22 @@ function drawSheet(){
     + (isOriginal()?' ／ <b style="color:#b8761c">あなたのオリジナル寸法です（説明書の数字とはちがいます）</b>':'');
   $('dZoomOut').hidden = !zoom;
   $('dfoot').innerHTML =
-    '<b>使い方</b>　上の数字が「材料の左端から何mm」。下の数字が「部品1つ分の長さ」。'
+    '<b>使い方</b>　材料の左端を0にして各位置に印をつけ、さしがねで垂線を引きます。部品名の下は仕上がり長さです。'
     +'<span style="color:#00a344">緑＝製材所が切った端（そのまま使える）</span>／'
-    +`<span style="color:#b0463c">赤い帯＝のこぎりの通り道（切りしろ${KERF}mm）</span>。`
+    +`<span style="color:#b0463c">赤い帯＝のこぎりの通り道（切りしろ${state.gap}mm）</span>。`
     +'けがきは<b>仕上がり線</b>と<b>切断線</b>の2本を引きましょう。'
     +(WORKS[state.work].original?'<br>'+processNotes(ps).map(esc).join('<br>'):'')
     +(isOriginal()&&state.comment
       ? `<br><span style="color:#b8761c">あなたのオリジナル寸法の理由：${
           state.comment.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</span>`
       : '');
+  if(state.work==='K'&&state.kSplit&&state.bookend){
+    const h=dimsOf().H,start=h+KERF,core=600-2*start,len=(core-state.gap)/2;
+    $('dfoot').innerHTML+=`<details open><summary>中央の端材で作るL形本立て</summary>
+    <svg width="220" height="58" viewBox="0 0 220 58" aria-label="左は切り分け、右は組立側面"><g fill="#ead4b1" stroke="#705536"><rect x="5" y="7" width="45" height="42"/><rect x="55" y="7" width="45" height="42"/><rect x="140" y="6" width="6" height="40"/><rect x="140" y="46" width="50" height="6"/></g><g text-anchor="middle" font-size="9"><text x="27" y="30">底板</text><text x="77" y="30">背板</text><text x="172" y="27">側面図</text></g></svg>
+    材料Bの左端から${mm(start)}〜${mm(600-start)}mmの長方形を取る。左端から${mm(start+len)}・${mm(start+len+state.gap)}mmに線を引き、150×${mm(len)}mmを2枚取る。
+    1枚を底板にし、もう1枚の150mmの木口を底板の広い面の端に合わせて直角に立て、接着して固定する。</details>`;
+  }
   const dpr=Math.min(devicePixelRatio||1,2);
   const W=drawCv.clientWidth,H=drawCv.clientHeight; if(!W||!H) return;
   drawCv.width=W*dpr; drawCv.height=H*dpr;
@@ -2787,8 +2813,8 @@ function drawSheet(){
       if(pw>34) g.fillText(`${mm(q.len)}mm`, x+pw/2, oy+bh/2+8*F);
       /* のこぎりの通り道 */
       g.fillStyle='rgba(176,70,60,.32)';
-      if(!q.endS) g.fillRect(x-KERF*sc,oy,KERF*sc,bh);
-      if(!q.endE) g.fillRect(x+pw,oy,KERF*sc,bh);
+      if(!q.endS) g.fillRect(x-state.gap*sc,oy,state.gap*sc,bh);
+      if(!q.endE) g.fillRect(x+pw,oy,state.gap*sc,bh);
       /* 製材所の端 */
       g.fillStyle='#00c853';
       if(q.endS) g.fillRect(x,oy,Math.max(3,5*sc),bh);
@@ -2851,23 +2877,13 @@ function drawSheet(){
       if(gw>40) g.fillText(`余り ${mm(a2-a1)}`, gx+gw/2, oy+bh/2);
     }
 
-    /* 下：一つずつの長さ／上：左端からの合計 */
+    /* メジャーの原点を動かさず、実際の配置の境界を読む。 */
     const cuts=[0];
     for(const q of b.placed){ cuts.push(q.x, q.x+q.len); }
     cuts.push(600);
     const uniq=[...new Set(cuts.map(v=>Number(mm(v))))].sort((a,b)=>a-b);
     g.strokeStyle='#8a8070'; g.lineWidth=1; g.font=`${11.5*F}px system-ui`;
-    const yb=oy+bh+22, yt=oy-24;
-    for(let i=0;i<uniq.length-1;i++){
-      const x1=ox+uniq[i]*sc, x2=ox+uniq[i+1]*sc;
-      g.beginPath(); g.moveTo(x1,yb); g.lineTo(x2,yb); g.stroke();
-      g.beginPath(); g.moveTo(x1,yb-4); g.lineTo(x1,yb+4);
-      g.moveTo(x2,yb-4); g.lineTo(x2,yb+4); g.stroke();
-      const t=String(uniq[i+1]-uniq[i]);
-      if(x2-x1>22){ const wd=g.measureText(t).width+6;
-        g.fillStyle='#fffdf8'; g.fillRect((x1+x2)/2-wd/2,yb-7,wd,14);
-        g.fillStyle='#2a2520'; g.fillText(t,(x1+x2)/2,yb); }
-    }
+    const yt=oy-24;
     /* 左端からの合計。数字がぶつかるときは2段に分ける */
     g.textAlign='center'; let lastR=-1e9;
     for(const v of uniq){
@@ -2880,8 +2896,11 @@ function drawSheet(){
       g.fillStyle='#8a5a2b'; g.fillText(t, x1, y);
     }
     g.textAlign='left'; g.fillStyle='#7b7166'; g.font=`${10.5*F}px system-ui`;
-    g.fillText('左端から', ox+bw+28, yt);
-    g.fillText('部品の長さ', ox+bw+28, yb);
+    g.fillText('左端から mm', ox+bw+28, yt);
+    g.strokeStyle='#8a8070';g.beginPath();g.moveTo(ox,oy-4);g.lineTo(ox+bw,oy-4);
+    for(const value of uniq){const x=ox+value*sc;g.moveTo(x,oy-8);g.lineTo(x,oy);}
+    g.stroke();
+
   });
 }
 drawCv.addEventListener('click',e=>{
@@ -3267,6 +3286,7 @@ function makeDimDOM(){
    + '<div class="row back"><button id="dimReset" type="button">↺ リセット<br>説明書の寸法に戻す</button></div>'
    + '<label><input type="checkbox" id="dimStep5">5mm刻みで調整する（外すと1mm刻み）</label>'
    + '<p class="tip">5mm刻みは教材の初期寸法が基準です。切り替えても現在の寸法は変わりません。</p>'
+   + (state.work==='K'?'<p><button id="fullK">A・Cを600 mmのまま使う</button></p><label>材料Bの取り方 <select id="splitK"><option>まとめて切る</option><option>左右の端から取る</option></select></label><p id="offcutK"><button id="freeK">端材の形と寸法</button> <button id="guideK">本立ての作り方</button></p>':'')
    + W.dims.map(t=>`<div class="dimrow" data-k="${t.k}">
        <div class="lb"><span>${t.label}</span><b></b></div>
        <input type="range" data-d="${t.k}" step="1" aria-label="${t.label}（mm）">
@@ -3278,6 +3298,22 @@ function makeDimDOM(){
       :state.work==='K'?'左右の側板は<b>1枚の共通材から糸のこで切り分け</b>ます。'
       :'縦びきはしないので、<b>板は同じ幅の材料からしか取れません</b>。')
    + '<b>同じ幅の材料の中で、どこかを縮めれば どこかを伸ばせます。</b></div>';
+  if(state.work==='K'){
+    $('fullK').onclick=()=>{
+      const old=state.nestBoard;
+      state.nestBoard={bo:'A',L:'B',sh:'C'};
+      if(!trySetDim('W',624)){state.nestBoard=old;refresh();}
+      else refresh();
+    };
+    $('splitK').selectedIndex=Number(state.kSplit);
+    $('splitK').onchange=e=>{state.kSplit=!!e.target.selectedIndex;state.bookend=false;dimKey=null;refresh();};
+    $('offcutK').hidden=!state.kSplit;
+    for(const [id,guide] of [['freeK',false],['guideK',true]]){
+      $(id).setAttribute('aria-pressed',String(state.bookend===guide));
+      $(id).classList.toggle('on',state.bookend===guide);
+      $(id).onclick=()=>{state.bookend=guide;dimKey=null;refresh();};
+    }
+  }
   $('size3').querySelectorAll('input[type=range]').forEach(r=>{
     const grab=()=>{ dimDrag=r; };
     r.addEventListener('pointerdown',grab);
@@ -3579,14 +3615,14 @@ function buildCards(){
       <div class="mm">${outer(key,true).W}×${outer(key,true).D}×${outer(key,true).H}mm<br>
         部品${L.pieces}点・切る${L.cuts}回・釘約${L.nails}本<br>
         <span style="color:#8a5a2b">${W.original?'近藤オリジナル ／ '+(key==='K'?'糸のこで段付き加工':'縦びきなし・耐荷重未確認'):'説明書の難易度は'+'★'.repeat(W.manual)}</span></div>`;
-    c.onclick=()=>chooseWork(key);
+    c.onclick=()=>selectWithGap(key);
     box.appendChild(c);
     requestAnimationFrame(()=>miniDraw(c.querySelector('canvas'),key));
   }
 }
 let savedDesign=null;
 function designFingerprint(){
-  return JSON.stringify([state.work,state.dims,state.corners,state.off,state.nestX,state.nestBoard,state.flip,
+  return JSON.stringify([state.gap,state.kSplit,state.bookend,state.work,state.dims,state.corners,state.off,state.nestX,state.nestBoard,state.flip,
     state.hole,state.handle,state.handleY,state.comment,state.who,state.refs,state.scene]);
 }
 function hasUnsavedChanges(){return savedDesign!==null&&savedDesign!==designFingerprint();}
@@ -3598,12 +3634,26 @@ function guardUnsaved(next){
   $('discardDesign').onclick=()=>{$('modal').hidden=true;next();};
 }
 window.addEventListener('beforeunload',e=>{if(hasUnsavedChanges()){e.preventDefault();e.returnValue='';}});
-function chooseWork(key,discard=false){
+function selectWithGap(key){
+  guardUnsaved(()=>{
+    const previous=state.gap,previousSplit=state.kSplit;
+    let fits;
+    try{state.gap=10;state.kSplit=false;fits=!nest(WORKS[key].make(defDims(key)),false).left.length;}
+    finally{state.gap=previous;state.kSplit=previousSplit;}
+    const dialog=$('gapDialog');
+    $('gapReason').textContent=fits?'材料の左端から測って印を付けます。':'この作品の初期寸法は10 mmでは材料に収まりません。';
+    $('gap10').disabled=!fits;
+    for(const gap of [5,10])$('gap'+gap).onclick=()=>{dialog.close();chooseWork(key,true,gap);};
+    $('gapBack').onclick=()=>dialog.close();
+    dialog.showModal();
+  });
+}
+function chooseWork(key,discard=false,gap=5){
   if(!discard&&hasUnsavedChanges()){guardUnsaved(()=>chooseWork(key,true));return;}
   designReadId++;designReading=false;
   clearLearningCue();$('learningStatus').textContent='板を選ぶと、3Dと材料取り図で同じ板を確認できます。';
   nestMessage='';
-  state.work=key; state.corners={}; state.off={}; state.nestX={}; state.nestBoard={}; state.flip={};
+  state.gap=gap;state.kSplit=false;state.bookend=false;state.work=key; state.corners={}; state.off={}; state.nestX={}; state.nestBoard={}; state.flip={};
   state.hole=null; state.handle=false; state.handleY=40;
   state.dimStep5=true; state.dims={}; state.comment=''; state.warned=false; dimKey=null; dimDrag=null;
   $('quiz').hidden=$('draw').hidden=$('view').hidden=$('sheet').hidden=true;
@@ -3731,7 +3781,7 @@ $('stlForm').onsubmit=async e=>{
 function saveFile(){
   const d=JSON.stringify({version:11,work:state.work,corners:state.corners,
     off:state.off,nestX:state.nestX,nestBoard:state.nestBoard,flip:state.flip,
-    dimStep5:state.dimStep5,dims:state.dims,comment:state.comment,who:state.who,scene:state.scene,
+    gap:state.gap,kSplit:state.kSplit,bookend:state.bookend,dimStep5:state.dimStep5,dims:state.dims,comment:state.comment,who:state.who,scene:state.scene,
     quiz:state.quiz,reco:state.reco,
     hole:state.hole,handle:state.handle,handleY:state.handleY,
     refs:state.refs,nextRef:state.nextRef},null,1);
@@ -3755,7 +3805,7 @@ function goScreen(k,skipCheck){
     $('draw').hidden=$('view').hidden=$('sheet').hidden=true;
     $('picker').style.display='none'; $('quiz').hidden=false;
     state.screen='quiz'; drawQuiz();
-    for(const id of ['mSteps','dSteps','vSteps','sSteps','qSteps']) stepBar($(id),'quiz');
+    stepBar($('mSteps'),'quiz');
     return;
   }
   $('quiz').hidden=true;
@@ -3787,7 +3837,7 @@ function goScreen(k,skipCheck){
   if(k==='main'){ resize(); refresh(); }
   if(k==='draw'){ state.drawZoom=null; requestAnimationFrame(()=>drawSheet()); }
   if(k==='view'||k==='sheet')refreshDesignDocuments();
-  for(const id of ['mSteps','dSteps','vSteps','sSteps','qSteps']) stepBar($(id),k);
+  stepBar($('mSteps'),k);
 }
 function openDraw(){ goScreen('draw'); }
 /* 材料の右はしがあいたままなら、けがきへ行く前に一度立ち止まらせる */
@@ -3859,6 +3909,8 @@ function validateDesign(d){
   const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
   const finite=x=>typeof x==='number'&&Number.isFinite(x);
   if(!object(d)||!Object.hasOwn(WORKS,d.work)) throw new Error('作品番号が不正です');
+  if(d.gap!==undefined&&![5,10].includes(d.gap))throw new Error('切りしろは5mmまたは10mmです');
+  for(const key of ['kSplit','bookend'])if(d[key]!==undefined&&typeof d[key]!=='boolean')throw new Error('端材設定が不正です');
   if(d.version!==undefined&&(!Number.isInteger(d.version)||d.version>11||d.version<1)) throw new Error('未対応の保存形式です');
   for(const key of ['dims','corners','off','nestX','nestBoard','flip'])
     if(d[key]!==undefined&&!object(d[key])) throw new Error(key+'の形式が不正です');
@@ -3899,7 +3951,7 @@ $('openFile').onchange=e=>{
       state.work=d.work; state.corners=d.corners||{}; state.off=d.off||{};
       state.nestX=d.nestX||{}; state.nestBoard=d.nestBoard||{}; state.flip=d.flip||{};
       state.hole=d.hole||null; state.handle=!!d.handle; state.handleY=d.handleY??40;
-      state.dimStep5=d.dimStep5!==false; state.dims=d.dims||{}; state.comment=d.comment||''; state.who=d.who||'';
+      state.gap=d.gap===10?10:5;state.kSplit=d.work==="K"&&d.kSplit===true;state.bookend=state.kSplit&&d.bookend===true;state.dimStep5=d.dimStep5!==false; state.dims=d.dims||{}; state.comment=d.comment||''; state.who=d.who||'';
       state.scene=SCENES[d.scene]?d.scene:'desk';
       state.quiz=d.quiz||null; state.reco=d.reco||null;
       const ss=$('sceneSel'); if(ss) ss.value=state.scene;
@@ -4681,7 +4733,7 @@ function drawQuizResult(){
       ? '置き場所は 決めていないということなので、ひとまず「自分のつくえの上」で見えるようにしました。'
       : `置き場所は「${SCENES[r.place].label}」にしておきました。`}あとから変えられます。</p>`;
   box.innerHTML=h;
-  box.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ chooseWork(b.dataset.go); });
+  box.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ selectWithGap(b.dataset.go); });
   box.querySelectorAll('[data-mini]').forEach(c=>
     requestAnimationFrame(()=>miniDraw(c,c.dataset.mini)));
   $('qAgain').onclick=()=>startQuiz();
