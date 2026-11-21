@@ -2746,10 +2746,15 @@ function drawDim(){
 const drawCv=$('drawCv');
 let sheetHit=[];
 // 寸法線は材料端を起点にする。右端に接する板は右から一度だけ測る。
+function needsStockEndAdjustment(board){
+  return board.placed.length>=2 &&
+    !(board.placed.some(p=>p.endS) && board.placed.some(p=>p.endE));
+}
 function stockMeasureLines(board){
+  if(needsStockEndAdjustment(board))return [];
   const lines=[];
-  board.placed.forEach((piece,i)=>{
-    const right=piece.endE || (board.placed.length===2 && i===1);
+  board.placed.forEach(piece=>{
+    const right=piece.endE;
     const origin=right?board.w:0;
     for(const mark of [piece.x,piece.x+piece.len]){
       if(mark<=0 || mark>=board.w)continue;
@@ -2768,7 +2773,7 @@ function drawSheet(){
   $('dZoomOut').hidden = !zoom;
   $('dfoot').innerHTML =
     '<b>使い方</b>　寸法線に書かれた「左から」「右から」の端にメジャーの0を当て、印をつけたら、さしがねで垂線を引きます。部品名の下は仕上がり長さです。'
-    +'<span style="color:#00a344">緑＝製材所が切った端（そのまま使える）</span>／'
+    +'<span style="color:#00a344">緑＝工場で正確に切ってある端。そのまま使えます。</span>／'
     +`<span style="color:#b0463c">赤い帯＝のこぎりの通り道（切りしろ${state.gap}mm）</span>。`
     +'けがきは<b>仕上がり線</b>と<b>切断線</b>の2本を引きましょう。'
     +(WORKS[state.work].original?'<br>'+processNotes(ps).map(esc).join('<br>'):'')
@@ -2839,7 +2844,6 @@ function drawSheet(){
 
       for(const member of stockMembers(ps,q)){
         const marks=[[0,'▲左端'],[member.w,'▲右端']];
-        if(isVerticalBoard(member))marks.push([member.w/2,'▲地']);
         g.save();g.fillStyle='#243b82';g.font='10px system-ui';g.textAlign='left';
         for(const [fx,label] of marks){const pt=stockPoint(member,q,fx,0);const right=pt[0]>q.len/2;
           g.textAlign=right?'right':'left';
@@ -2895,6 +2899,11 @@ function drawSheet(){
       if(gw>40) g.fillText(`余り ${mm(a2-a1)}`, gx+gw/2, oy+bh/2);
     }
 
+    if(needsStockEndAdjustment(b)){
+      g.font='12px system-ui';g.textAlign='center';g.fillStyle='#815321';
+      g.fillText('②3Dで確認に戻り、板を材料の端に寄せて、工場で切った端を活用しましょう。',ox+bw/2,oy+bh+13,W-16);
+      return;
+    }
     const levels={0:0,[b.w]:0};
     g.font='11px system-ui';g.textAlign='center';
     for(const {origin,mark,distance} of stockMeasureLines(b)){
