@@ -4505,7 +4505,7 @@ const QUIZ=[
  {q:'できあがったら、どこに置きますか？',
   a:['自分のつくえの上','台所のカウンター','リビングのゆか','本だなの中／どこでもよい']},
  {q:'だれのために作りますか？',
-  a:['自分のため','家族のため','教室や部活など、みんなで使う']},
+  a:['自分のため','家族のため']},
  {q:'小学校などで、のこぎりで木を切って 物を作ったことはありますか？',
   a:['何回もある','1〜2回ある','ほとんどない']},
  {q:'説明書を見て、板を合わせて組み立てることに、自信はありますか？',
@@ -4681,7 +4681,7 @@ function drawQuiz(){
   if($('qCodeGo')) $('qCodeGo').onclick=()=>{
     const v=($('qCode').value||'').replace(/[^0-9]/g,'');
     if(v.length!==QUIZ.length){ alert(`タイプ番号は ${QUIZ.length}けたの数字です。`); return; }
-    const ans=[...v].map((c,j)=>Math.max(1,Math.min(QUIZ[j].a.length,+c)));
+    const ans=[...v].map((c,j)=>Math.max(1,Math.min(j===3 && c==='3'?3:QUIZ[j].a.length,+c)));
     state.quiz={ans,step:QUIZ.length-1,done:true}; finishQuiz(); drawQuiz();
   };
 }
