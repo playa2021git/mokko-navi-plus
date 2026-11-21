@@ -510,6 +510,8 @@ body.dim main{height:calc(100vh - 42px)}
 
 <dialog id="gapDialog" aria-labelledby="gapTitle">
   <h3 id="gapTitle">板と板の間の切りしろを選ぶ</h3>
+  <p>切りしろは、部品と部品の間に残しておく余白です。のこぎりが少しずれても、余白の中なら、使う板を削らずにすみます。</p>
+  <p><b>5 mm</b> は余白がせまく、線にそって切るのが少しむずかしくなります。<br><b>10 mm（1 cm）</b> は余白が広めです。初めてで、材料に余裕があるときに選べます。</p>
   <p id="gapReason"></p>
   <button id="gap5">5 mm</button> <button id="gap10">10 mm</button>
   <button id="gapBack">作品選びに戻る</button>
@@ -2743,6 +2745,19 @@ function drawDim(){
    ========================================================= */
 const drawCv=$('drawCv');
 let sheetHit=[];
+// 寸法線は材料端を起点にする。右端に接する板は右から一度だけ測る。
+function stockMeasureLines(board){
+  const lines=[];
+  board.placed.forEach((piece,i)=>{
+    const right=piece.endE || (board.placed.length===2 && i===1);
+    const origin=right?board.w:0;
+    for(const mark of [piece.x,piece.x+piece.len]){
+      if(mark<=0 || mark>=board.w)continue;
+      lines.push({origin,mark,distance:Math.abs(mark-origin)});
+    }
+  });
+  return lines;
+}
 function drawSheet(){
   if($('draw').hidden) return;
   const ps=parts(), {boards}=nest(ps);
@@ -2752,7 +2767,7 @@ function drawSheet(){
     + (isOriginal()?' ／ <b style="color:#b8761c">あなたのオリジナル寸法です（説明書の数字とはちがいます）</b>':'');
   $('dZoomOut').hidden = !zoom;
   $('dfoot').innerHTML =
-    '<b>使い方</b>　材料の左端を0にして各位置に印をつけ、さしがねで垂線を引きます。部品名の下は仕上がり長さです。'
+    '<b>使い方</b>　寸法線に書かれた「左から」「右から」の端にメジャーの0を当て、印をつけたら、さしがねで垂線を引きます。部品名の下は仕上がり長さです。'
     +'<span style="color:#00a344">緑＝製材所が切った端（そのまま使える）</span>／'
     +`<span style="color:#b0463c">赤い帯＝のこぎりの通り道（切りしろ${state.gap}mm）</span>。`
     +'けがきは<b>仕上がり線</b>と<b>切断線</b>の2本を引きましょう。'
@@ -2775,7 +2790,8 @@ function drawSheet(){
   g.fillStyle='#fffdf8'; g.fillRect(0,0,W,H);
   sheetHit=[];
 
-  const LW=98, RW=124, TOP=36, BOT=48;                  // 1枚分の上下の余白
+  const lanes=b=>{const lines=stockMeasureLines(b);return Math.max(1,...[0,b.w].map(origin=>lines.filter(l=>l.origin===origin).length));};
+  const LW=98, RW=124, TOP=14, BOT=12+15*Math.max(...list.map(lanes));                  // 1枚分の上下の余白
   const rowH=(H-10)/list.length;
   const sc=Math.min((W-LW-RW)/600,
                     (rowH-TOP-BOT)/Math.max(...list.map(b=>b.h)));
@@ -2825,7 +2841,9 @@ function drawSheet(){
         const marks=[[0,'▲左端'],[member.w,'▲右端']];
         if(isVerticalBoard(member))marks.push([member.w/2,'▲地']);
         g.save();g.fillStyle='#243b82';g.font='10px system-ui';g.textAlign='left';
-        for(const [fx,label] of marks){const pt=stockPoint(member,q,fx,0);g.fillText(label,x+pt[0]*sc,oy+pt[1]*sc-5);}g.restore();
+        for(const [fx,label] of marks){const pt=stockPoint(member,q,fx,0);const right=pt[0]>q.len/2;
+          g.textAlign=right?'right':'left';
+          g.fillText(label,x+pt[0]*sc+(right?-2:2),oy+pt[1]*sc+(pt[1]<q.bw/2?7:-7));}g.restore();
       }
       /* 穴 */
       {
@@ -2877,30 +2895,20 @@ function drawSheet(){
       if(gw>40) g.fillText(`余り ${mm(a2-a1)}`, gx+gw/2, oy+bh/2);
     }
 
-    /* メジャーの原点を動かさず、実際の配置の境界を読む。 */
-    const cuts=[0];
-    for(const q of b.placed){ cuts.push(q.x, q.x+q.len); }
-    cuts.push(600);
-    const uniq=[...new Set(cuts.map(v=>Number(mm(v))))].sort((a,b)=>a-b);
-    g.strokeStyle='#8a8070'; g.lineWidth=1; g.font=`${11.5*F}px system-ui`;
-    const yt=oy-24;
-    /* 左端からの合計。数字がぶつかるときは2段に分ける */
-    g.textAlign='center'; let lastR=-1e9;
-    for(const v of uniq){
-      const x1=ox+v*sc, t=String(v), half=g.measureText(t).width/2+4;
-      const up = (x1-half < lastR);
-      const y = up ? yt-13 : yt;
-      if(!up) lastR = x1+half;
-      g.save(); g.strokeStyle='#cfc4b2'; g.setLineDash([3,3]); g.lineWidth=1;
-      g.beginPath(); g.moveTo(x1,y+7); g.lineTo(x1,oy); g.stroke(); g.restore();
-      g.fillStyle='#8a5a2b'; g.fillText(t, x1, y);
+    const levels={0:0,[b.w]:0};
+    g.font='11px system-ui';g.textAlign='center';
+    for(const {origin,mark,distance} of stockMeasureLines(b)){
+      const from=ox+origin*sc,to=ox+mark*sc;
+      const y=oy+bh+12+15*levels[origin]++;
+      g.strokeStyle='#786b55';g.lineWidth=1;
+      g.beginPath();g.moveTo(from,y-3);g.lineTo(from,y+3);g.moveTo(from,y);g.lineTo(to,y);
+      g.moveTo(to,y-3);g.lineTo(to,y+3);g.stroke();
+      const text=(origin?'右から ':'左から ')+mm(distance)+' mm';
+      const width=g.measureText(text).width+6;
+      const mid=Math.abs(to-from)>width+8?(from+to)/2:to+(origin?-1:1)*(width/2+5);
+      g.fillStyle='#fffdf8';g.fillRect(mid-width/2,y-6,width,12);
+      g.fillStyle='#543d27';g.fillText(text,mid,y);
     }
-    g.textAlign='left'; g.fillStyle='#7b7166'; g.font=`${10.5*F}px system-ui`;
-    g.fillText('左端から mm', ox+bw+28, yt);
-    g.strokeStyle='#8a8070';g.beginPath();g.moveTo(ox,oy-4);g.lineTo(ox+bw,oy-4);
-    for(const value of uniq){const x=ox+value*sc;g.moveTo(x,oy-8);g.lineTo(x,oy);}
-    g.stroke();
-
   });
 }
 drawCv.addEventListener('click',e=>{
@@ -3641,7 +3649,7 @@ function selectWithGap(key){
     try{state.gap=10;state.kSplit=false;fits=!nest(WORKS[key].make(defDims(key)),false).left.length;}
     finally{state.gap=previous;state.kSplit=previousSplit;}
     const dialog=$('gapDialog');
-    $('gapReason').textContent=fits?'材料の左端から測って印を付けます。':'この作品の初期寸法は10 mmでは材料に収まりません。';
+    $('gapReason').textContent=fits?'この作品では、どちらも選べます。':'この作品の初期寸法は10 mmでは材料に収まりません。';
     $('gap10').disabled=!fits;
     for(const gap of [5,10])$('gap'+gap).onclick=()=>{dialog.close();chooseWork(key,true,gap);};
     $('gapBack').onclick=()=>dialog.close();
