@@ -70,6 +70,7 @@ for(const k of 'ABCDEFGHIJKL'){
  const ids=run('parts().map(p=>p.id)');
  for(const id of ids){
   canvasText.length=0;run(`state.sel='${id}';state.showDim=true;drawDim()`);
+  if(run("drivingFaces(parts().find(p=>p.id===state.sel),parts()).length")===2)run('otherDrivingFace=true;drawDim()');
   assert.equal(canvasText.filter(t=>/^\d+: (左|右)/.test(t)).length,run(`nailSpots(parts()).filter(n=>n.driver==='${id}').length`),`${k}/${id}: all nail coordinates`);
  }
 }

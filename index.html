@@ -362,7 +362,7 @@ body.dim main{height:calc(100vh - 42px)}
       <button id="roomBtn">置いて見る</button>
       <select id="sceneSel" title="置く場所"></select>
       <button id="nameBtn">板の名前</button><button id="nailBtn">釘を見る</button>
-      <button id="endBtn">材料の両はし</button><button id="dimBtn">寸法を見る</button>
+      <button id="endBtn">材料の両はし</button><button id="dimBtn">寸法を見る</button><button id="dimFace" hidden>打つ面を切替</button>
     </div>
     <div id="studyPane" hidden></div>
     <canvas id="dimCv" hidden></canvas>
@@ -1423,6 +1423,19 @@ function nailCoordinates(p,ps=parts()){
   return nailSpots(ps).filter(n=>n.driver===p.id).map((n,i)=>{
     const f=toFace(p,n.pos),d=datum.nearest?{...datum,x:f[0]<=p.w/2?0:p.w,xLabel:f[0]<=p.w/2?'左端':'右端'}:datum;
     return {number:i+1,nail:n,f,x:Math.abs(f[0]-d.x),y:f[1],datum:d};
+  });
+}
+// faceTo3D defines the drawing face on the positive thickness axis.
+function drivingFaces(p,ps){
+  const all=nailCoordinates(p,ps);
+  return [...new Set(all.map(r=>r.nail.dir))].map(dir=>{
+    const x=value=>dir>0?p.w-value:value;
+    const rows=all.filter(r=>r.nail.dir===dir).map(r=>{
+      const fx=x(r.f[0]),left=fx<=p.w/2;
+      return {...r,f:[fx,r.f[1]],datum:{...r.datum,x:left?0:p.w,xLabel:left?'左端':'右端'}};
+    });
+    const labels=p.posture==='side'?['左面','右面']:p.posture==='flat'?['下面','上面']:['背面','前面'];
+    return {dir,x,rows,label:labels[dir>0?0:1]};
   });
 }
 const stage=$('stage');
@@ -2536,7 +2549,10 @@ nestCv.addEventListener('pointercancel',()=>{ nestDrag=null; });
    材料の端を基準に、釘の位置を何mmか書く。
    ========================================================= */
 const dimCv=$('dimCv');
+let otherDrivingFace=false, lastDimPart='';
+$('dimFace').onclick=()=>{otherDrivingFace=!otherDrivingFace;drawDim();};
 function drawDim(){
+  $('dimFace').hidden=true;
   if(!state.showDim) return;
   const ps=parts();
   const p=(state.selKind==='part'&&ps.find(x=>x.id===state.sel))||ps[0];
@@ -2548,7 +2564,12 @@ function drawDim(){
 
   /* この板から打ち込む釘を、面の座標に移す */
   const nameOf=id=>{const q=ps.find(x=>x.id===id);return q?q.label:id;};
-  const coords=nailCoordinates(p,ps),datum=nailDatum(p,ps);
+  const faces=drivingFaces(p,ps),partKey=state.work+'/'+p.id;
+  if(lastDimPart!==partKey){otherDrivingFace=false;lastDimPart=partKey;}
+  const face=faces[Number(otherDrivingFace)]||faces[0],coords=face?.rows||[],datum=nailDatum(p,ps);
+  const faceX=face?.x||(x=>x);
+  $('dimFace').hidden=faces.length<2;
+  if(faces.length===2)$('dimFace').textContent=faces[Number(face===faces[0])].label+'を見る';
   const mine=coords.map(r=>({f:r.f,bw:r.nail.bw,into:r.nail.into}));
   const xValues=[...new Set(coords.map(r=>r.f[0]))].sort((a,b)=>a-b);
   const yValues=[...new Set(coords.map(r=>r.f[1]))].sort((a,b)=>a-b);
@@ -2573,7 +2594,7 @@ function drawDim(){
 
   /* 板 */
   const out=partOutline(p);
-  g.beginPath(); out.forEach((q,i)=>i?g.lineTo(X(q[0]),Y(q[1])):g.moveTo(X(q[0]),Y(q[1]))); g.closePath();
+  g.beginPath(); out.forEach((q,i)=>i?g.lineTo(X(faceX(q[0])),Y(q[1])):g.moveTo(X(faceX(q[0])),Y(q[1]))); g.closePath();
   g.fillStyle='#f0dfc4'; g.fill();
   g.strokeStyle='#7b5c33'; g.lineWidth=1.6; g.stroke();
   /* 木目 */
@@ -2587,7 +2608,7 @@ function drawDim(){
   }
   g.restore();
   /* 穴 */
-  const hl=holeOf(p);
+  const hole=holeOf(p),hl=hole&&{...hole,cx:faceX(hole.cx)};
   if(hl){
     g.save();
     drawSlot(g,X(hl.cx),Y(hl.cy),(hl.kind==='cable'?hl.r:hl.hw)*s,hl.r*s,false);
@@ -2669,8 +2690,8 @@ function drawDim(){
   g.textAlign='left';
   p.corners.forEach((c,i)=>{
     if(c.type==='none') return;
-    const lx=X(cpos[i][0])+(i===1||i===2?-6:6), ly=Y(cpos[i][1])+(i>=2?-14:14);
-    g.fillStyle='#8a5a2b'; g.textAlign=(i===1||i===2)?'right':'left';
+    const lx=X(faceX(cpos[i][0]))+(faceX(cpos[i][0])>0?-6:6), ly=Y(cpos[i][1])+(i>=2?-14:14);
+    g.fillStyle='#8a5a2b'; g.textAlign=(faceX(cpos[i][0])>0)?'right':'left';
     const cs=mm(Math.min(c.size,Math.min(p.w,p.h)/2));
     g.fillText(c.type==='round'?`R${cs}`:`${cs}の斜め`, lx, ly);
   });
@@ -2678,7 +2699,7 @@ function drawDim(){
   /* 見出し */
   g.textAlign='left'; g.textBaseline='alphabetic';
   g.fillStyle='#2a2520'; g.font='600 15px system-ui';
-  g.fillText(`${p.label}`, 12, 96);
+  g.fillText(p.label+(face?"（"+face.label+"から打つ）":""), 12, 96);
   g.font='11.5px system-ui'; g.fillStyle='#7b7166';
   g.fillText(`仕上がり 12 × ${p.bw} × ${mm(cutLen(p))} mm`, 12, 112);
   g.textAlign='right';
@@ -4137,7 +4158,7 @@ function assemblySteps(ps){
 /* ---------- ⑤ 説明書と部品別の釘位置図 ---------- */
 function nailDatumSheet(ps){
   return ps.map(p=>{
-    const rows=nailCoordinates(p,ps);if(!rows.length)return '';
+    return drivingFaces(p,ps).map(({dir,x:faceX,rows,label:faceLabel})=>{
     const xs=[...new Set(rows.map(r=>r.f[0]))].sort((a,b)=>a-b);
     const ys=[...new Set(rows.map(r=>r.f[1]))].sort((a,b)=>a-b);
     const datum=nailDatum(p,ps),ox=44+ys.length*3,oy=40;
@@ -4150,20 +4171,20 @@ function nailDatumSheet(ps){
       return {origin,label:center?`左右から${distance}（中心）`:`${origin===0?'左':'右'}から${distance}`};
     };
     let body=`<g data-nail-part="${p.id}" font-family="sans-serif">`;
-    body+=`<text x="12" y="29" font-size="3.2">釘を打ち込む面。単位mm。縦板は地から測ります。</text>`;
-    const outline=partOutline(p).map(([x,y])=>`${X(x)},${Y(y)}`).join(' '),clipId=`nail-face-${state.work}-${p.id}`;
+    body+=`<text x="12" y="29" font-size="3.2">${faceLabel}から釘を打ち込む。単位mm。縦板は地から測ります。</text>`;
+    const outline=partOutline(p).map(([x,y])=>`${X(faceX(x))},${Y(y)}`).join(' '),clipId=`nail-face-${state.work}-${p.id}-${dir}`;
     body+=`<defs><clipPath id="${clipId}"><polygon points="${outline}"/></clipPath></defs>`;
     body+=`<polygon points="${outline}" fill="#f0dfc4" stroke="#7b5c33" stroke-width=".4"/>`;
     const hole=holeOf(p);
     if(hole){
-      if(hole.kind==='cable')body+=`<circle cx="${X(hole.cx)}" cy="${Y(hole.cy)}" r="${hole.r*scale}" fill="white" stroke="#00913c" stroke-width=".3"/>`;
-      else body+=`<rect x="${X(hole.cx-hole.hw)}" y="${Y(hole.cy+hole.r)}" width="${hole.hw*2*scale}" height="${hole.r*2*scale}" rx="${hole.r*scale}" fill="white" stroke="#c96a00" stroke-width=".3"/>`;
+      if(hole.kind==='cable')body+=`<circle cx="${X(faceX(hole.cx))}" cy="${Y(hole.cy)}" r="${hole.r*scale}" fill="white" stroke="#00913c" stroke-width=".3"/>`;
+      else body+=`<rect x="${X(faceX(hole.cx)-hole.hw)}" y="${Y(hole.cy+hole.r)}" width="${hole.hw*2*scale}" height="${hole.r*2*scale}" rx="${hole.r*scale}" fill="white" stroke="#c96a00" stroke-width=".3"/>`;
     }
     const f=factoryEnds(ps).get(p.id);
     if(f){for(const end of ['s','e'])if(f[end]){
       const along=lenAxis(p)==='h',value=end==='s'?0:(along?p.h:p.w);
       body+=along?`<line x1="${X(0)}" y1="${Y(value)}" x2="${X(p.w)}" y2="${Y(value)}" stroke="#00a344" stroke-width="1.1" clip-path="url(#${clipId})"/>`
-        :`<line x1="${X(value)}" y1="${Y(0)}" x2="${X(value)}" y2="${Y(p.h)}" stroke="#00a344" stroke-width="1.1" clip-path="url(#${clipId})"/>`;
+        :`<line x1="${X(faceX(value))}" y1="${Y(0)}" x2="${X(faceX(value))}" y2="${Y(p.h)}" stroke="#00a344" stroke-width="1.1" clip-path="url(#${clipId})"/>`;
     }}
     const line=(x1,y1,x2,y2)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#aa9e90" stroke-width=".2"/>`;
     xs.forEach((fx,i)=>{
@@ -4198,9 +4219,10 @@ function nailDatumSheet(ps){
     }).join('');
     body+=table(rows.slice(0,pageRows),tableY);
     body+=`<text x="12" y="285" font-size="2.8" fill="#00913c">緑＝工場カット面。図の形・穴・釘位置は現在の設計を反映。</text></g>`;
-    let pages=sheetSvg(`${WORKS[state.work].name}　釘位置・基準面：${p.label}`,`仕上がり ${mm(p.w)}×${mm(p.h)}mm　板厚12mm／釘番号は②3Dの寸法図と共通`,body);
+    let pages=sheetSvg(`${WORKS[state.work].name}　釘位置・基準面：${p.label}（${faceLabel}）`,`仕上がり ${mm(p.w)}×${mm(p.h)}mm　板厚12mm／釘番号は②3Dの寸法図と共通`,body);
     for(let i=pageRows;i<rows.length;i+=pageRows)pages+=sheetSvg(p.label+'　釘位置の続き','板の端から釘の中心まで。単位mm。',table(rows.slice(i,i+pageRows),tableY));
     return pages;
+    }).join('');
   }).join('');
 }
 function mountingRows(ps){

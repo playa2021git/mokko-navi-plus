@@ -41,8 +41,8 @@ fs.mkdirSync(output,{recursive:true});
     for(const p of model.sizes.filter(p=>p.nails.length)){
      const diagram=page.locator(`[data-nail-part="${p.id}"]`);
      assert.equal(await diagram.locator('[data-nail-number]').count(),p.nails.length);
-     assert((await diagram.textContent()).includes(`幅 ${p.w}mm`),key+' current nail diagram width '+p.id);
-     assert((await diagram.textContent()).includes(`高さ ${p.h}mm`),key+' current nail diagram height '+p.id);
+     assert(((await diagram.allTextContents()).join(' ')).includes(`幅 ${p.w}mm`),key+' current nail diagram width '+p.id);
+     assert(((await diagram.allTextContents()).join(' ')).includes(`高さ ${p.h}mm`),key+' current nail diagram height '+p.id);
     }
     await page.evaluate(()=>goScreen('view',true));
     assert((await page.locator('#vBody').textContent()).includes(`外はば ${model.outer.W}mm ・ おくゆき ${model.outer.D}mm ・ 高さ ${model.outer.H}mm`));
