@@ -4694,29 +4694,24 @@ function finishQuiz(){
 }
 function drawQuizResult(){
   const r=recommend(state.quiz.ans), box=$('qBody');
-  const top=r.list;
+  const highlighted=[...r.list,...r.alternatives];
+  const highlightedKeys=new Set(highlighted.map(x=>x.key));
+  const others=Object.keys(WORKS).filter(key=>!highlightedKeys.has(key)).map(key=>({key,why:[WORKS[key].desc]}));
   let h=`<div class="qprog">そうだんの けっか</div>
    <div class="qcodeout">あなたは <b>${state.quiz.code}</b> タイプでした
      <span>この番号をひかえておくと、次に開いたとき すぐ同じ結果が出せます</span></div>
-   <p class="qlead"><b>${r.purpose.name}</b>を選んだあなたへ。形と組み立てやすさで比べてみましょう。
+   <p class="qlead"><b>${r.purpose.name}</b>を選んだあなたへ。全12作品のどれでも選べます。色のついた枠には、そうだんの理由を書いています。
      自分の持ち物が収まるかは、大きさを測って②3Dで確かめましょう。</p>
    <div class="qcards">`;
-  for(const x of top){
+  for(const x of [...highlighted,...others]){
     const W=WORKS[x.key], d=defDims(x.key);
-    h+=`<div class="qcard" data-level="${x.level}"><b>${x.label}</b><div class="t">${W.name}
+    h+=`<div class="qcard"${x.level?` data-level="${x.level}"`:''}>${x.label?`<b>${x.label}</b>`:''}<div class="t">${W.name}
       <span class="st">${STAR(workload(x.key).stars)}</span></div>
       <canvas data-mini="${x.key}"></canvas>
       <div class="mm">${d.W}×${W.D}×${d.H}mm</div>
       <ul>${x.why.slice(0,3).map(t=>`<li>${esc(t)}</li>`).join('')}</ul>
       <button data-go="${x.key}">この作品でつくる</button></div>`;
   }
-  h+='</div>';
-  if(r.alternatives.length){
-    h+='<details><summary>用途を変えて、もっと簡単な作品も見る</summary><div class="qrest">';
-    for(const x of r.alternatives)h+=`<button class="rcard" data-level="orange" data-go="${x.key}"><b>${x.label}：${WORKS[x.key].name}</b><br>${esc(x.why.join(' '))}</button>`;
-    h+='</div></details>';
-  }
-  h+='<div><button id="allQuizWorks">全作品から選ぶ</button>';
   h+=`</div><div class="qrow"><button id="qAgain">もう一度 そうだんする</button>
     <span class="grow"></span></div>
     <p class="note">${r.anyPlace
@@ -4726,7 +4721,6 @@ function drawQuizResult(){
   box.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ selectWithGap(b.dataset.go); });
   box.querySelectorAll('[data-mini]').forEach(c=>
     requestAnimationFrame(()=>miniDraw(c,c.dataset.mini)));
-  $('allQuizWorks').onclick=()=>goScreen('pick');
   $('qAgain').onclick=()=>startQuiz();
 }
 
