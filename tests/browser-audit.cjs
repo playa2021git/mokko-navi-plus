@@ -10,13 +10,16 @@ const output=process.env.AUDIT_OUTPUT||path.join(require('os').tmpdir(),'mokko-v
   const sliders=await page.locator('#size3 input[data-d]').evaluateAll(es=>es.map(e=>({k:e.dataset.d,min:+e.min,max:+e.max,step:+e.step,value:+e.value})));
   for(const t of sliders){
    await page.evaluate(k=>chooseWork(k,true),key);
+   await page.locator("#dimStep5").uncheck();
    const before=await page.evaluate(()=>JSON.stringify(parts().map(p=>[p.id,p.w,p.h,p.pos])));
-   const target=t.value-t.step>=t.min?t.value-t.step:t.value+t.step;
+   // I at H=199 intersects the chamfer; release-qa covers blocked designs.
+   const target=key==='I'&&t.k==='H'?t.value+t.step:t.value-t.step>=t.min?t.value-t.step:t.value+t.step;
    await page.locator(`#size3 input[data-d="${t.k}"]`).evaluate((e,v)=>{e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));},target);
    const snapshot=await page.evaluate(()=>({dims:dimsOf(),geom:JSON.stringify(parts().map(p=>[p.id,p.w,p.h,p.pos])),bad:nailSpots(parts(),true).filter(n=>!n.valid).length,left:nest(parts()).left.length,outer:outer()}));
    assert.equal(snapshot.dims[t.k],target,key+' slider '+t.k);assert.notEqual(snapshot.geom,before);assert.equal(snapshot.bad,0);assert.equal(snapshot.left,0);
    for(const screen of ['draw','view','sheet']){
     await page.evaluate(k=>goScreen(k,true),screen);
+    assert.equal(await page.evaluate(()=>state.screen),screen);
     const content=await page.locator(screen==='draw'?'#dfoot':screen==='view'?'#vBody':'#sBody').textContent();assert(!/NaN|undefined/.test(content));
     if(screen!=='draw'){
      const overflow=await page.locator(screen==='view'?'#vBody svg.a4':'#sBody svg.a4').evaluateAll(es=>es.flatMap(svg=>[...svg.querySelectorAll('text')].filter(t=>{const b=t.getBBox(),m=svg.getScreenCTM().inverse().multiply(t.getScreenCTM());const corners=[[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>new DOMPoint(x,y).matrixTransform(m));return corners.some(p=>p.x<-.5||p.y<-.5||p.x>211||p.y>298);}).map(t=>t.textContent)));

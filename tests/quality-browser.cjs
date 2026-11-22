@@ -7,7 +7,7 @@ const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
  for(const channel of ['chrome','msedge']){
   const browser=await chromium.launch({channel,headless:true});const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('file:///'+path.join(__dirname,'../index.html').replace(/\\/g,'/'));
-  await page.evaluate(()=>{chooseWork('A',true);state.dims.W=282;state.corners.L=[{type:'round',size:5},none,none,none];state.hole={id:'bo',x:100};state.comment='授業用の保存と寸法検証です';refresh();window.showSaveFilePicker=undefined;});
+  await page.evaluate(()=>{chooseWork('A',true);state.dims.W=282;state.corners.L=[none,none,none,{type:'round',size:5}];state.hole={id:'bo',x:100};state.comment='授業用の保存と寸法検証です';refresh();window.showSaveFilePicker=undefined;});
   const expected=await page.evaluate(()=>Array.from(new Uint8Array(buildSTL(5))));
   for(const [width,height] of [[1280,720],[1366,768],[1920,1080]]){
    await page.setViewportSize({width,height});
@@ -19,7 +19,7 @@ const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
      assert(await q.evaluate(e=>{const b=e.getBoundingClientRect();return document.elementFromPoint(b.x+b.width/2,b.y+b.height/2)===e;}),'covered '+id);
     }
     assert(await page.locator('#mSteps').textContent().then(t=>t.includes('②3Dで確認')));
-    const jsonDownload=page.waitForEvent('download');await page.click('#save');const json=await jsonDownload;const saved=JSON.parse(fs.readFileSync(await json.path(),'utf8'));assert.equal(saved.dims.W,282);assert.equal(saved.corners.L[0].size,5);assert.equal(saved.hole.x,100);
+    const jsonDownload=page.waitForEvent('download');await page.click('#save');const json=await jsonDownload;const saved=JSON.parse(fs.readFileSync(await json.path(),'utf8'));assert.equal(saved.dims.W,282);assert.equal(saved.corners.L[3].size,5);assert.equal(saved.hole.x,100);
     await page.click('#stlBtn');await page.selectOption('#stlScale','5');const download=page.waitForEvent('download');await page.click('#stlForm button[type=submit]');const stl=await download;
     assert(stl.suggestedFilename().endsWith('_5分の1.stl'));assert.equal(hash(fs.readFileSync(await stl.path())),hash(Buffer.from(expected)),screen+' same STL');
     await page.screenshot({path:path.join(output,`quality-${channel}-${width}-${screen}.png`),fullPage:true});

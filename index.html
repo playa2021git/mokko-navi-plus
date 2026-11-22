@@ -4201,7 +4201,7 @@ function dividerAssemblyDims(ps){
 }
 function assemblySteps(ps){
   if(state.work==='K')return [
-    '材料取り図の共通線で側板2枚を切り分け、右側板を面内で180度回す。',
+    state.kSplit?processNotes(ps)[0]:'材料取り図の共通線で側板2枚を切り分け、右側板を面内で180度回す。',
     '下段展示板を左右側板に挟み、図の高さで直角に合わせて釘とボンドで接合。',
     '上段60mm幅の展示板を奥側に挟み、釘とボンドで接合。',
     '背板は使わない。展示板と左右側板の直角を確認し、ボンド硬化まで固定。'];
@@ -4727,11 +4727,11 @@ function drawQuizResult(){
      自分の持ち物が収まるかは、大きさを測って②3Dで確かめましょう。</p>
    <div class="qcards">`;
   for(const x of [...highlighted,...others]){
-    const W=WORKS[x.key], d=defDims(x.key);
+    const W=WORKS[x.key], d=outer(x.key,true);
     h+=`<div class="qcard"${x.level?` data-level="${x.level}"`:''}>${x.label?`<b>${x.label}</b>`:''}<div class="t">${W.name}
       <span class="st">${STAR(workload(x.key).stars)}</span></div>
       <canvas data-mini="${x.key}"></canvas>
-      <div class="mm">${d.W}×${W.D}×${d.H}mm</div>
+      <div class="mm">${d.W}×${d.D}×${d.H}mm</div>
       <ul>${x.why.slice(0,3).map(t=>`<li>${esc(t)}</li>`).join('')}</ul>
       <button data-go="${x.key}">この作品でつくる</button></div>`;
   }
