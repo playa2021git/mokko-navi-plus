@@ -95,6 +95,32 @@ fs.mkdirSync(output,{recursive:true});
   assert.equal(await page.evaluate(()=>nestRange(parts(),'L').bd.id),'B');
   const afterMove=await snapshot();assert.equal(afterMove.geometry,beforeMove.geometry);assert.deepEqual(afterMove.stl,beforeMove.stl);
   await roundtrip('A');
+  // G's bottom board can take either factory end with the small handhold blank still present.
+  await page.evaluate(()=>{chooseWork('G',true);state.cornerBoth=true;refresh();});
+  const gBefore=await snapshot();
+  for(const side of ['right','left']){
+   const points=await page.evaluate(side=>{
+    const r=nestCv.getBoundingClientRect(),hit=nestHit.find(t=>!t.hole&&t.id==='bo'),row=nestRows.find(t=>t.id==='A');
+    return {from:r.left+(hit.x0+hit.x1)/2,to:r.left+(side==='right'?row.x1-1:row.x0+1),y:r.top+(row.y0+row.y1)/2};
+   },side);
+   await page.mouse.move(points.from,points.y);await page.mouse.down();
+   await page.mouse.move(points.to,points.y,{steps:8});await page.mouse.up();
+   const layout=await page.evaluate(()=>{
+    const ps=parts(),{bd,q}=nestRange(ps,'bo');
+    return {board:bd.id,ids:bd.placed.map(p=>p.id),x:q.x,endS:q.endS,endE:q.endE,
+     exactGap:bd.placed.every((p,i)=>i===0||p.x>=bd.placed[i-1].x+bd.placed[i-1].len+state.gap),
+     factoryEnd:factoryEnds(ps).get('bo')};
+   });
+   assert.equal(layout.board,'A');assert(layout.exactGap);
+   assert.deepEqual(layout.ids,side==='right'?['bk','h1','bo']:['bo','bk','h1']);
+   assert.equal(layout.x,side==='right'?344:0);
+   assert.equal(layout[side==='right'?'endE':'endS'],true);
+   assert(layout.factoryEnd[side==='right'?'e':'s']);
+   const after=await snapshot();
+   assert.equal(after.geometry,gBefore.geometry);assert.deepEqual(after.stl,gBefore.stl);
+  }
+  await roundtrip('G');
+  console.log('PASS G bottom board real drag to both factory ends, same stock/geometry and restored layout');
   // Incoming malformed board assignments must be rejected before applying any state.
   assert(await page.evaluate(()=>{
    for(const d of [{work:'A',nestBoard:{L:'C'}},{work:'A',nestBoard:{missing:'A'}},{work:'A',nestBoard:{L:'D'}}]){
