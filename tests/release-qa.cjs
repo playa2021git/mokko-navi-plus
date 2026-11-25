@@ -31,18 +31,18 @@ const assert=require('node:assert/strict'),path=require('node:path'),fs=require(
   assert.equal(await page.evaluate(()=>parts().find(p=>p.id==='sh').w),125.5);
   assert.equal(await page.evaluate(()=>nest(parts()).boards.flatMap(b=>b.placed).find(q=>q.id==='sh').len),125.5);
   assert.match(await page.locator('#ptbl').textContent(),/12×150×125\.5/);
-  await page.locator('#cbox input[data-s="3"]').fill('30.5');await page.locator('#cbox input[data-s="3"]').press('Tab');
-  assert.match(await page.evaluate(()=>cornerText(parts().find(p=>p.id==='L'))),/30\.5/);
+  await page.locator('#workCornerSize').selectOption('30');
+  assert.match(await page.evaluate(()=>cornerText(parts().find(p=>p.id==='L'))),/30 mm/);
   await page.evaluate(()=>{state.comment='置く場所に合わせて幅を変更しました。';state.warned=true;goScreen('sheet',true);});
   assert.equal(await page.locator('#sBody svg.a4').first().locator('text').filter({hasText:'12×150×125.5'}).count(),1);
   assert.match(await page.locator('#sBody .dimension-overview').textContent(),/125\.5 × 150/);await assertPaperFits();
   const geometry=await page.evaluate(()=>JSON.stringify(parts()));
   const download=page.waitForEvent('download');await page.locator('#save').click();const file=await download;
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mokko-release-qa-')),saved=path.join(dir,'fractional.json');await file.saveAs(saved);
-  const json=JSON.parse(fs.readFileSync(saved,'utf8'));assert.equal(json.dims.W,287);assert.equal(json.corners.L[3].size,30.5);
+  const json=JSON.parse(fs.readFileSync(saved,'utf8'));assert.equal(json.dims.W,287);assert.equal(json.corner.size,30);
   await select('A');await page.locator('#openFile').setInputFiles(saved);await page.waitForFunction(()=>!designReading&&state.work==='I');
   assert.equal(await page.evaluate(()=>JSON.stringify(parts())),geometry);
-  console.log('PASS 125.5mm shelf, 30.5mm corner: model, material layout, table, paper, JSON');
+  console.log('PASS 125.5mm shelf, 30mm corner: model, material layout, table, paper, JSON');
   // Reproduce the original QA bug through actual right-drag input.
   await select('A');await page.locator('[data-part-id="L"]').click();await page.waitForTimeout(150);
   const cv=await page.locator('#stage canvas:not(#dimCv)').boundingBox(),x=cv.x+cv.width-80,y=cv.y+150;
@@ -56,13 +56,13 @@ const assert=require('node:assert/strict'),path=require('node:path'),fs=require(
   console.log('PASS detached board and 0.5mm gap: warning, true outer extent, all document/STL gates');
   // Both corner types must block even when all selected nail paths are still valid.
   for(const type of ['chamfer','round']){
-   await select('A');await page.locator('#cbox select[data-t="3"]').selectOption(type);
+   await select('A');await page.locator('#workCornerType').selectOption(type);
    await page.locator('#dimStep5').uncheck();
    await page.locator('[data-d="sh"]').evaluate(e=>{e.value=280;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));});
    assert.equal(await page.evaluate(()=>dimsOf().sh),280);assert.equal(await page.evaluate(()=>nailSpots(parts(),true).filter(n=>!n.valid).length),0);
    assert.match(await page.locator('#msgs').textContent(),/接合面が角加工/);await assertBlocked();
    // Exact tangent boundary is valid; half a millimetre past it is not.
-   await page.evaluate(()=>{state.corners.R[3].type=state.corners.L[3].type;state.dims.sh=265;refresh();});
+   await page.evaluate(()=>{state.dims.sh=265;refresh();});
    assert.equal(await page.evaluate(()=>constructionIssues().length),0);
    await page.evaluate(()=>{state.dims.sh=265.5;refresh();});assert((await page.evaluate(()=>constructionIssues().length))>0);
    await page.evaluate(()=>{state.dims.sh=265;state.comment='棚板の位置を加工範囲から下げました。';state.warned=true;refresh();goScreen('sheet',true);});assert.equal(await page.evaluate(()=>state.screen),'sheet');

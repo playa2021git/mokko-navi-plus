@@ -4,7 +4,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright'),assert=req
  try{
   const page=await browser.newPage({viewport:{width:1366,height:768},acceptDownloads:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(process.env.APP_URL||'file:///'+path.join(__dirname,'../index.html').replace(/\\/g,'/'));
-  await page.evaluate(()=>chooseWork('D',true));
+  await page.evaluate(()=>{chooseWork('D',true);state.corner={...none};refresh();});
   for(const [key,value] of [['H',175],['sh',95]])await page.locator(`[data-d="${key}"]`).evaluate((e,value)=>{e.value=value;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));},value);
   await page.locator('#endBtn').click();
   const drag=await page.evaluate(()=>{const g=nestRange(parts(),'dv'),hit=nestHit.find(h=>h.id==='dv'&&!h.hole),r=nestCv.getBoundingClientRect();return {x:r.left+(hit.x0+hit.x1)/2,y:r.top+(hit.y0+hit.y1)/2,delta:(g.bd.w-g.q.len-g.q.x)*hit.sc};});
@@ -29,7 +29,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright'),assert=req
   await page.evaluate(()=>chooseWork('A',true));await page.locator('#openFile').setInputFiles(saved);await page.waitForFunction(()=>!designReading&&state.work==='D');
   assert(await page.evaluate(()=>endReport(parts()).some(r=>r.id==='dv'&&r.where==='下'&&r.ok)),'factory-end mapping restored from JSON');
   // Existing ground-contact shortcut remains present for a side board.
-  await page.evaluate(()=>{chooseWork('A',true);trySetDim('H',290,true);state.nestX.R=600-290;state.showEnds=true;refresh();});
+  await page.evaluate(()=>{chooseWork('A',true);state.corner={...none};trySetDim('H',290,true);state.nestX.R=600-290;state.showEnds=true;refresh();});
   assert(await page.locator('[data-floor-flip="R"]').isVisible());await page.locator('[data-floor-flip="R"]').click();
   assert(await page.evaluate(()=>endReport(parts()).some(r=>r.id==='R'&&r.where==='下'&&r.ok)));
   assert.deepEqual(errors,[]);console.log('PASS D 254/175/95: real material drag, raised-divider repair in warning/layout/right controls, unchanged geometry/nails/STL/layout, JSON restore; ground shortcut retained');

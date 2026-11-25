@@ -23,21 +23,21 @@ function inspect(divisor){
  return count;
 }
 for(const k of 'ABCDEFGHIJKL'){
- run(`state.work='${k}';state.dims={};state.corners={};state.off={};state.hole=null;state.handle=false;state.refs=[];`);
+ run(`state.work='${k}';state.dims={};state.corner=null;state.off={};state.hole=null;state.handle=false;state.refs=[];`);
  for(const d of [2,3,5,10])inspect(d);
 }
-run("state.work='A';state.corners={};state.hole=null;state.handle=false");
+run("state.work='A';state.corner=null;state.hole=null;state.handle=false");
 const plain=inspect(2);
 run("state.hole={id:'bo',x:100}");assert(inspect(2)>plain);
 run("state.hole=null;state.handle=true");assert(inspect(2)>plain);
-run("state.handle=false;state.corners.L=[{type:'round',size:40},none,none,none]");assert(inspect(3)>plain);
+run("state.handle=false;state.corner=round_(40)");assert(inspect(3)>plain);
 const before=run('buildSTL(5)');
 run("state.refs=[{kind:'book',w:100,h:100,d:100,pos:[999,999,999]}]");
 assert.deepEqual(Buffer.from(run('buildSTL(5)')),Buffer.from(before));
 assert.throws(()=>run('buildSTL(4)'));
 assert(html.includes('#stage canvas{display:block;width:100%;height:100%}'));
 for(const [key,volume] of [['K',1680120.0],['L',2301840]]){
- run(`state.work='${key}';state.dims={};state.corners={};state.off={};state.hole=null;state.handle=false;state.refs=[];`);
+ run(`state.work='${key}';state.dims={};state.corner=null;state.off={};state.hole=null;state.handle=false;state.refs=[];`);
  const v=new DataView(run('buildSTL(2)'));let signed=0;
  for(let i=0;i<v.getUint32(80,true);i++){
   const o=84+i*50+12,a=[0,1,2].map(j=>v.getFloat32(o+j*4,true)),b=[0,1,2].map(j=>v.getFloat32(o+12+j*4,true)),c=[0,1,2].map(j=>v.getFloat32(o+24+j*4,true));

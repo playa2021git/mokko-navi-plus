@@ -13,10 +13,11 @@ labels = {
     'whoIn':'名前', 'flipBtn':'材料の端を反対側にする', 'refClear':'中の物を ぜんぶ出す',
     'rw':'横', 'rd':'奥', 'rh':'高さ', 'dimStep5':'5mm刻みで調整する（外すと1mm刻み）',
     'splitK':'材料Bの取り方', 'holeSel':'ケーブルを通す穴（φ25）', 'handBtn':'くりぬく',
-    'mCmt':'どうしてその大きさにしたのか', 'qCode':'タイプ番号'
+    'mCmt':'どうしてその大きさにしたのか', 'qCode':'タイプ番号',
+    'workCornerType':'形状', 'workCornerSize':'加工寸法'
 }
 families = {
-    'data-t=':'加工しない','data-s="${i}"':'左上','data-s="${k}"':'⓪そうだん',
+    'data-s="${k}"':'⓪そうだん',
     'data-r=':'＋教科書','data-d=':'外はば','class="why"':'いま最大・なぜ？',
     'data-a=':'ある','data-go=':'この作品でつくる','data-end-flip=':'接地側に反転',
     'data-end-repair=':'接地側に反転'
@@ -32,7 +33,7 @@ for m in re.finditer(r'<(button|select|input|textarea|option|summary|h[234]|th|a
     literal = re.sub('<[^>]+>', ' ', body)
     literal = ' '.join(literal.split())
     if tag == 'option' and '${' in literal:
-        name = '〈板名〉にあける' if 'にあける' in literal else '置く場所'
+        name = '〈板名〉にあける' if 'にあける' in literal else '加工寸法' if literal == '${size} mm' else '置く場所'
     elif literal == '${esc(Q.q)}':
         name = '家の中に、置き場所が決まっていなくて 散らかってしまう物がありますか？'
     else:

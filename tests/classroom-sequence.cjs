@@ -13,7 +13,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
     try{
      if(op===0){chooseWork('ABCDEFGHIJKL'[random(12)],true);if(Object.keys(state.off).length||state.hole||Object.keys(state.dims).length)throw Error('state leak');}
      if(op===1){const t=WORKS[state.work].dims[random(WORKS[state.work].dims.length)],l=dimLim(t,dimsOf());trySetDim(t.k,[l[0],l[1],t.def][random(3)],true);}
-     if(op===2){const p=parts()[0];if(state.corners[p.id])delete state.corners[p.id];else state.corners[p.id]=[{type:'round',size:4},none,none,none];}
+     if(op===2)state.corner=state.corner?null:round_(10);
      if(op===3){const p=holeParts()[0];if(p)state.hole=state.hole?null:{id:p.id,x:p.w/2};}
      if(op===4){const prev=state.gap;state.gap=prev===5?10:5;if(nest(parts()).left.length)state.gap=prev;}
      if(op===5){document.querySelectorAll('[data-v]')[random(4)].click();}

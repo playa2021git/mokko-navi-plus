@@ -6,7 +6,7 @@ function between(a,b){return script.slice(script.indexOf(a),script.indexOf(b));}
 const code=between('const T=12','const stage=')+between('function checkAll(', 'const nestCv=')+between('function partTable(', 'function showTable(')+between('function validateDesign(', "$('openFile').onchange")+between('const SQ2=', 'const QUIZ=')+between('const QUIZ=', 'const QSCENE=');
 const context=vm.createContext({console});vm.runInContext(code+between('function stockMembers(', 'function nestHole('),context);
 const run=s=>vm.runInContext(s,context);
-function select(k){run(`state.work='${k}';state.dims={};state.corners={};state.hole=null;state.handle=false;state.off={};state.nestX={};state.refs=[];LBLKEY='';`);}
+function select(k){run(`state.work='${k}';state.dims={};state.corner=null;state.hole=null;state.handle=false;state.off={};state.nestX={};state.refs=[];LBLKEY='';`);}
 for(const k of 'ABCDEFGHIJKL'){
  select(k);
  assert.equal(run('nest(parts()).left.length'),0,k+' stock');
@@ -20,10 +20,9 @@ for(const k of 'ABCDEFGHIJKL'){
 select('I');assert(run("assemblySteps(parts()).join('').includes('仕切板から棚板へ')"));
 select('G');assert(run("assemblySteps(parts()).join('').includes('取っ手①')"));
 select('J');assert(!run("assemblySteps(parts()).join('').includes('仕切板②を前に当て')"));
-select('A');run("state.corners.L=[{type:'chamfer',size:50},none,none,none]");
-assert(run('nailSpots(parts(),true).some(n=>!n.valid)'));
+select('A');run("state.corner=chamfer(50);state.dims.sh=280");
 assert(run("checkAll(parts(),[]).msgs.some(m=>m.lv==='bad')"));
-assert.equal(run('partTable(parts(),true).filter(r=>r.bw===150&&r.len===315).length'),2);
+assert.equal(run('partTable(parts(),true).filter(r=>r.bw===150&&r.len===315).length'),1);
 select('A');assert.equal(run('workload(state.work).cuts'),6);
 run("state.nestX.sh=340;state.nestX.bo=340;state.nestX.b2=316");
 assert.equal(run('workload(state.work).cuts'),6);

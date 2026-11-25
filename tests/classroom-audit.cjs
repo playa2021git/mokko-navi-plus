@@ -12,7 +12,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
  await page.evaluate(()=>{
   let seed=20261122;const rand=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return Math.floor(seed/4294967296*n);};
   for(let i=0;i<3000;i++){
-   const key='ABCDEFGHIJKL'[rand(12)],w=WORKS[key];state.work=key;state.off={};state.nestX={};state.nestBoard={};state.flip={};state.corners={};state.hole=null;state.handle=false;state.dims={};state.gap=rand(2)?5:10;
+   const key='ABCDEFGHIJKL'[rand(12)],w=WORKS[key];state.work=key;state.off={};state.nestX={};state.nestBoard={};state.flip={};state.corner=null;state.hole=null;state.handle=false;state.dims={};state.gap=rand(2)?5:10;
    const t=w.dims[rand(w.dims.length)],lim=dimLim(t,dimsOf());state.dims[t.k]=[lim[0],lim[1],t.def,lim[0]+rand(1+lim[1]-lim[0])][rand(4)];
    const ps=parts(),layout=nest(ps),fail=m=>{throw Error(JSON.stringify({i,key,dims:state.dims,gap:state.gap,m}));};
    if(ps.some(p=>![p.w,p.h,cutLen(p)].every(v=>Number.isFinite(v)&&v>0)))fail('size');
