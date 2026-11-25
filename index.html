@@ -582,40 +582,54 @@ function cutLen(p){ return lenAxis(p)==='h' ? p.h : p.w; }
 /* 木目の向き：切り取った長さが板の縦（h）なら縦木目 */
 function grainVertical(p){ return lenAxis(p)==='h'; }
 
-const LAMINATE_BASE='#e3c392',LAMINATE_TILE_MM=300;
+const LAMINATE_COLORS=['#f3e3cc','#f1e0c7','#f5e7d1','#efdec6','#f2e2cb','#f4e5ce'];
+const LAMINATE_BASE=LAMINATE_COLORS[0],LAMINATE_LENGTH=600,LAMINATE_WIDTH=300;
 const laminateTiles=new Map();
+// 共通のmm座標で、長手方向に細長い材と、ずらした継ぎ目を作る。
+const laminateDesign=(()=>{
+  let seed=6937;
+  const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+  const n=13,strip=LAMINATE_WIDTH/n,cells=[],fibers=[],seams=[];
+  for(let row=0;row<n;row++){
+    const y=row*strip,start=-rnd()*LAMINATE_LENGTH*.48;
+    const joint1=start+LAMINATE_LENGTH*(.25+rnd()*.19),joint2=joint1+LAMINATE_LENGTH*(.23+rnd()*.14);
+    const joints=[start,joint1,joint2,start+LAMINATE_LENGTH];
+    let shade=Math.floor(rnd()*LAMINATE_COLORS.length);
+    for(let j=0;j<3;j++){
+      const x=joints[j],w=joints[j+1]-x;
+      const lines=Array.from({length:12},()=>[rnd()*w*.28,strip*(.04+rnd()*.92),w*(.46+rnd()*.25),(rnd()-.5)*1.3]);
+      for(const offset of [0,LAMINATE_LENGTH]){
+        const left=x+offset;
+        if(left>=LAMINATE_LENGTH||left+w<=0)continue;
+        cells.push({x:left,y,w,h:strip+.15,shade});
+        if(left>=0)seams.push([left,y,left,y+strip]);
+        for(const [at,h,length,wave] of lines){
+          const x1=left+at,x2=x1+length;
+          if(x1<LAMINATE_LENGTH&&x2>0)fibers.push([x1,y+h,x2,y+h+wave]);
+        }
+      }
+      shade=(shade+1+Math.floor(rnd()*(LAMINATE_COLORS.length-1)))%LAMINATE_COLORS.length;
+    }
+    seams.push([0,y,LAMINATE_LENGTH,y]);
+  }
+  return {cells,fibers,seams};
+})();
+const LAMINATE_FIBER='#987044',LAMINATE_SEAM='#9b7651';
 function laminatedCanvas(vertical,neutral=false){
   const key=Number(vertical)+':'+Number(neutral);
   if(laminateTiles.has(key))return laminateTiles.get(key);
-  const S=512,c=document.createElement('canvas');c.width=c.height=S;
+  const c=document.createElement('canvas');c.width=vertical?512:1024;c.height=vertical?1024:512;
   const g=c.getContext('2d');
-  if(vertical){g.translate(S,0);g.rotate(Math.PI/2);}
-  const palette=neutral?['#fcfbf8','#eee9e0','#e4dbcf','#f5f1e9','#faf6ee']:
-    [LAMINATE_BASE,'#edcfa4','#dbb681','#f0d7b1','#e9c99b','#dcb989'];
-  let seed=6937;
-  const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-  const strip=S/13;
-  for(let row=0;row<13;row++){
-    const y=row*strip,start=-rnd()*S*.48;
-    const joint1=start+S*(.25+rnd()*.19),joint2=joint1+S*(.23+rnd()*.14);
-    const joints=[start,joint1,joint2,start+S];
-    let shade=Math.floor(rnd()*palette.length);
-    for(let j=0;j<3;j++){
-      const x=joints[j],width=joints[j+1]-x;
-      g.fillStyle=palette[shade];
-      shade=(shade+1+Math.floor(rnd()*(palette.length-1)))%palette.length;
-      for(const offset of [0,S])g.fillRect(x+offset,y,width,strip+.2);
-      const lines=Array.from({length:4},()=>[rnd()*width*.45,strip*(.13+rnd()*.74),width*(.28+rnd()*.23)]);
-      g.strokeStyle='rgba(112,77,37,.11)';g.lineWidth=.8;
-      for(const offset of [0,S]){
-        for(const [at,h,length] of lines){
-          g.beginPath();g.moveTo(x+offset+at,y+h);
-          g.lineTo(x+offset+at+length,y+h+.8);g.stroke();
-        }
-        g.fillStyle='rgba(112,77,37,.20)';g.fillRect(x+offset,y,1.25,strip);
-      }
-    }
-    g.fillStyle='rgba(112,77,37,.22)';g.fillRect(0,y,S,1.4);
+  if(vertical){g.translate(c.width,0);g.rotate(Math.PI/2);}
+  g.scale(1024/LAMINATE_LENGTH,512/LAMINATE_WIDTH);
+  const palette=neutral?['#fcfaf5','#faf7f1','#fdfbf7','#f9f6f0','#fbf8f3','#fcf9f4']:LAMINATE_COLORS;
+  for(const {x,y,w,h,shade} of laminateDesign.cells){
+    g.fillStyle=palette[shade];g.fillRect(x,y,w,h);
+  }
+  for(const [lines,color,opacity,width] of [[laminateDesign.fibers,LAMINATE_FIBER,.14,.33],[laminateDesign.seams,LAMINATE_SEAM,.12,.5]]){
+    g.beginPath();
+    for(const [x,y,a,b] of lines){g.moveTo(x,y);g.lineTo(a,b);}
+    g.globalAlpha=opacity;g.strokeStyle=color;g.lineWidth=width;g.stroke();
   }
   laminateTiles.set(key,c);
   return c;
@@ -624,11 +638,24 @@ function laminatedFill(g,x,y,scale,vertical=false){
   if(typeof DOMMatrix==='undefined'||!(scale>0))return LAMINATE_BASE;
   const tile=laminatedCanvas(vertical),pattern=g.createPattern(tile,'repeat');
   if(!pattern?.setTransform)return LAMINATE_BASE;
-  const factor=scale*LAMINATE_TILE_MM/tile.width;
+  const factor=scale*LAMINATE_LENGTH/1024;
   pattern.setTransform(new DOMMatrix([factor,0,0,factor,x,y]));
   return pattern;
 }
-
+let laminateSvgContent;
+function laminateSvgPattern(id,x,y,sx,sy,vertical=false){
+  if(!laminateSvgContent){
+    const round=v=>v.toFixed(1);
+    const shapes=LAMINATE_COLORS.map((color,i)=>`<path fill="${color}" d="${laminateDesign.cells.filter(cell=>cell.shade===i)
+      .map(({x,y,w,h})=>`M${round(x)} ${round(y)}h${round(w)}v${round(h)}h${round(-w)}Z`).join('')}"/>`).join('');
+    const lines=(segments,color,opacity,width)=>`<path fill="none" stroke="${color}" stroke-opacity="${opacity}" stroke-width="${width}"
+      d="${segments.map(([x,y,a,b])=>`M${round(x)} ${round(y)} ${round(a)} ${round(b)}`).join('')}"/>`;
+    laminateSvgContent=shapes+lines(laminateDesign.fibers,LAMINATE_FIBER,.14,.33)+lines(laminateDesign.seams,LAMINATE_SEAM,.12,.5);
+  }
+  const transform=vertical?[0,sy,-sx,0,x+LAMINATE_WIDTH*sx,y]:[sx,0,0,sy,x,y];
+  return `<pattern id="${id}" width="${LAMINATE_LENGTH}" height="${LAMINATE_WIDTH}" patternUnits="userSpaceOnUse"
+    patternTransform="matrix(${transform.join(' ')})">${laminateSvgContent}</pattern>`;
+}
 /* =========================================================
    2) 作品例A〜J（資料の部品表・組立図のとおり）
    すべて mm。x=左右 / y=高さ / z=前後（＋が手前）
@@ -1051,6 +1078,21 @@ function nestRange(ps,id){
                  hi:(next?next.x-state.gap:bd.w)-q.len};
   }
   return null;
+}
+
+// 材料の端を指定したら、同じ列の部品を必要な分だけずらす。
+function moveStockPartToEnd({bd,q},toRight){
+  const positions={...state.nestX},others=bd.placed.filter(p=>p.id!==q.id);
+  positions[q.id]=toRight?bd.w-q.len:0;
+  let edge=toRight?positions[q.id]-state.gap:q.len+state.gap;
+  if(toRight)others.reverse();
+  for(const part of others){
+    const pos=toRight?Math.min(part.x,edge-part.len):Math.max(part.x,edge);
+    positions[part.id]=pos;
+    edge=toRight?pos-state.gap:pos+part.len+state.gap;
+  }
+  state.nestX=positions;
+  state.warned=false;
 }
 
 /* 材料間の移動・交換。完成品の形は変えず、共通材はまとめて動かす。 */
@@ -1804,12 +1846,12 @@ if(HAS3D){
   function grainTex(vertical){
     const t=new THREE.CanvasTexture(laminatedCanvas(vertical,true));
     t.wrapS=t.wrapT=THREE.RepeatWrapping;
-    t.repeat.set(1/LAMINATE_TILE_MM,1/LAMINATE_TILE_MM);
+    t.repeat.set(1/(vertical?LAMINATE_WIDTH:LAMINATE_LENGTH),1/(vertical?LAMINATE_LENGTH:LAMINATE_WIDTH));
     const cap=renderer.capabilities; t.anisotropy=(cap&&cap.getMaxAnisotropy)?cap.getMaxAnisotropy():1;
     return t;
   }
   const GRAIN={x:grainTex(false), y:grainTex(true)};
-  const TONE={wood:0xd9a86b, sel:0xc2694a, warn:0xcf9aa4};
+  const TONE={wood:0xebcfa8, sel:0xc48c68, warn:0xcf9aa4};
   const MATS={};
   function woodMat(dir,kind,clear){
     const ends=clear==='ends';
@@ -2514,13 +2556,13 @@ function processNotes(ps=parts()){
     return [];
   });
 }
-function sharedBlankSvg(ps,q,x,y,sx,sy){
+function sharedBlankSvg(ps,q,x,y,sx,sy,wood){
   if(!q.process)return '';
   const points=pts=>pts.map(([a,b])=>`${mm(x+a*sx)},${mm(y+b*sy)}`).join(' ');
   let svg='';
   for(const p of stockMembers(ps,q)){
     const pts=partOutline(p).map(([a,b])=>stockPoint(p,q,a,b));
-    svg+=`<polygon points="${points(pts)}" fill="#ead4b1" stroke="#6b5233" stroke-width=".25"/>`;
+    svg+=`<polygon points="${points(pts)}" fill="${wood}" stroke="#6b5233" stroke-width=".25"/>`;
   }
   for(const line of processLines(ps,q))svg+=`<polyline points="${points(line)}" fill="none" stroke="#b0463c" stroke-width="${mm(KERF*Math.min(sx,sy))}"/>`;
   return svg;
@@ -2530,6 +2572,8 @@ function manufacturingSheet(ps){
   if(!WORKS[state.work].original&&!hasCorners)return '';
   const {boards}=nest(ps);let body='';
   const sx=.28,sy=sx,ox=22,u=.28;
+  const id='material-wood-'+state.work,wood=`url(#${id})`;
+  body+=`<defs>${laminateSvgPattern(id,ox,40,sx,sy)}</defs>`;
   let oy=40;
   for(const b of boards){
     const bh=b.h*sy,bw=b.w*sx,margin=stockCornerBottomMargin(b,ps,u);
@@ -2538,9 +2582,9 @@ function manufacturingSheet(ps){
     for(const q of b.placed){
       const x=ox+q.x*sx,w=q.len*sx;
       const outline=stockCornerOutline(ps,q,x,oy,sx,sy);
-      if(outline)body+=`<polygon points="${svgPoints(outline)}" fill="${FINISHED_BOARD}"/>`;
-      body+=`<rect x="${x}" y="${oy}" width="${w}" height="${bh}" fill="${outline?'none':FINISHED_BOARD}" stroke="${DRAW_INK}" stroke-width=".25"/>`;
-      body+=sharedBlankSvg(ps,q,x,oy,sx,sy);
+      if(outline)body+=`<polygon points="${svgPoints(outline)}" fill="${wood}"/>`;
+      body+=`<rect x="${x}" y="${oy}" width="${w}" height="${bh}" fill="${outline?'none':wood}" stroke="${DRAW_INK}" stroke-width=".25"/>`;
+      body+=sharedBlankSvg(ps,q,x,oy,sx,sy,wood);
       for(const end of [q.endS?x:null,q.endE?x+w-1:null]){
         if(end!==null)body+=`<rect x="${end}" y="${oy}" width="1" height="${bh}" fill="${FACTORY_EDGE}"/>`;
       }
@@ -2556,7 +2600,7 @@ function manufacturingSheet(ps){
     body+=stockDimensions(b,ox,oy,sx,sy,u,margin).map(d=>diagramDimensionSvg(d,u)).join('');
     const marks=b.placed.map(q=>mm(q.x)+'〜'+mm(q.x+q.len)).join(' ／ ');
     if(marks)body+=`<text x="${ox}" y="${oy+bh+15+margin}" font-size="2.6" fill="${DRAW_INK}">材料左端からの仕上がり位置　${marks}</text>`;
-    oy+=bh+28+margin;
+    oy+=bh+30+margin;
   }
   let y=Math.max(234,oy-2);
   const notes=hasCorners?[cornerMarkNote(),...processNotes(ps)]:processNotes(ps);
@@ -2565,7 +2609,7 @@ function manufacturingSheet(ps){
   }
   if(state.work==='L')body+=`<text x="14" y="${y+4}" font-size="3.2" fill="#b0463c">耐荷重未確認。80kg対応の表示・判断には実物試験が必要。</text>`;
   return sheetSvg(WORKS[state.work].name+'　3枚の材料・追加加工',
-    '単位 mm ／ 白＝仕上がり ／ 灰＝切り落とす部分・余り ／ 緑＝材料端 ／ 赤＝切りしろ',body);
+    '単位 mm ／ 木目＝仕上がり ／ 灰＝切り落とす部分・余り ／ 緑＝材料端 ／ 赤＝切りしろ',body);
 }
 
 function nestHole(ps,q){
@@ -2697,8 +2741,8 @@ function drawNest(){
   $('nestNote').innerHTML = (left.length
     ? `／ 取れない板：${left.map(i=>i.label).join('・')}`
     : (state.showEnds
-        ? `／ <span style="color:#00a344">緑＝製材所が切った端</span>・左右で位置調整、A/Bの行をまたいで移動・交換できます`
-        : `／ 左右で位置調整・A/Bの行をまたいで移動・部品の上で交換（切りしろ ${state.gap}mm）`))
+        ? `／ <span style="color:#00a344">緑＝製材所が切った端</span>・端までドラッグで並べ替え、A/B間で移動・交換`
+        : `／ 左右にドラッグ、端で並べ替え・A/B間で移動・部品の上で交換（切りしろ ${state.gap}mm）`))
     + (boards.some(b=>b.placed.length&&b.placed.at(-1).x+b.placed.at(-1).len<b.w-.5)?'<br>材料の右端にも、製材所で切られた面があります。部品を移動して活用できないか考えてみよう。接合や接地に適した場所で使えるかを考え、使わない選択もできます。':'')
     + ps.map(p=>{const target=supportedFlipCandidate(ps,p.id);return target?'<br><span style="color:#b0463c">'+esc(p.label)+'：製材所の端が'+target.from+'側です。</span> <button data-end-flip="'+p.id+'"'+(target.floor?' data-floor-flip="'+p.id+'"':'')+'>'+target.label+'</button>':'';}).join('')
     + (nestMessage?'<br><b role="status">'+esc(nestMessage)+'</b>':'')
@@ -2710,6 +2754,7 @@ function drawNest(){
 
 /* --- 材料取り図のドラッグ：材料の端や隣の部品にスナップ --- */
 let nestDrag=null, nestRows=[], nestMessage='';
+const STOCK_SNAP=14;
 function nestPick(e){
   const r=nestCv.getBoundingClientRect();
   const x=e.clientX-r.left, y=e.clientY-r.top;
@@ -2738,7 +2783,7 @@ nestCv.addEventListener('pointermove',e=>{
   if(row&&current&&row.id!==current.bd.id)return;
   let x=Math.max(nestDrag.lo,Math.min(nestDrag.hi,nestDrag.base+d));
   /* スナップ：材料の左端・右端・動ける限界 */
-  const SNAP=14;
+  const SNAP=STOCK_SNAP;
   for(const target of [0, nestDrag.bw-nestDrag.len, nestDrag.lo, nestDrag.hi]){
     if(Math.abs(x-target)<SNAP && target>=nestDrag.lo-0.1 && target<=nestDrag.hi+0.1){ x=target; break; }
   }
@@ -2750,8 +2795,20 @@ nestCv.addEventListener('pointermove',e=>{
 nestCv.addEventListener('pointerup',e=>{
   const d=nestDrag;nestDrag=null;if(!d||d.hole)return;
   const r=nestCv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
-  const row=nestRows.find(b=>x>=b.x0&&x<=b.x1&&y>=b.y0&&y<=b.y1);
-  const source=nestRange(parts(),d.id);if(!row||!source||row.id===source.bd.id)return;
+  const row=nestRows.find(b=>y>=b.y0&&y<=b.y1);
+  const source=nestRange(parts(),d.id);if(!row||!source)return;
+  if(row.id===source.bd.id){
+    const wanted=d.base+(e.clientX-d.startX)/d.sc;
+    const right=wanted>d.base&&wanted>=source.bd.w-d.len-STOCK_SNAP;
+    const left=wanted<d.base&&wanted<=STOCK_SNAP;
+    if((right&&!source.q.endE)||(left&&!source.q.endS)){
+      moveStockPartToEnd(source,right);
+      nestMessage=`${source.q.label}を材料${row.id}の${right?'右':'左'}端へ移動しました。`;
+      refresh();
+    }
+    return;
+  }
+  if(x<row.x0||x>row.x1)return;
   const hit=nestHit.find(t=>!t.hole&&t.id!==d.id&&x>=t.x0&&x<=t.x1&&y>=t.y0&&y<=t.y1);
   state.nestX=d.originalX;
   const ok=moveStockPart(d.id,row.id,Math.round((x-row.ox)/row.sc-d.len/2),hit?hit.id:null);
@@ -2759,7 +2816,10 @@ nestCv.addEventListener('pointerup',e=>{
     :(row.id==='C'||source.bd.id==='C'?'材料A・Bと材料Cは交換できません。':'材料に収まりません。左右の側板の高さなどを縮めてから交換してください。');
   refresh();
 });
-nestCv.addEventListener('pointercancel',()=>{ nestDrag=null; });
+nestCv.addEventListener('pointercancel',()=>{
+  if(nestDrag&&!nestDrag.hole){state.nestX=nestDrag.originalX;nestDrag=null;refresh();}
+  else nestDrag=null;
+});
 
 /* =========================================================
    9.5) 寸法図（板1枚を原寸の形で見る）
@@ -4309,7 +4369,7 @@ function placeView(vk,ps,s,ox,oy,bw,bh,opt={}){
   const pl=q=>q.map(a=>(px+a[0]*s).toFixed(2)+','+(py+a[1]*s).toFixed(2)).join(' ');
   let g='';
   for(const sh of arr){
-    const fill=opt.plain?'#ffffff':(sh.p.role==='back'?'#efe2c8':'#f6ecd8');
+    const fill=opt.plain?'#ffffff':(sh.p.role==='back'?'#efdec6':LAMINATE_BASE);
     for(const surface of sh.surfaces||[sh.hull])g+=`<polygon points="${pl(surface)}" fill="${fill}" stroke="#2a2520" stroke-width="0.5"/>`;
     g+=`<polygon points="${pl(sh.face)}" fill="none" stroke="#2a2520" stroke-width="0.35"/>`;
     /* 穴。板の面がこちらを向いている図と等角図だけに、実際の形でかく */
@@ -4487,8 +4547,10 @@ function nailDatumSheet(ps){
     let body=`<g data-nail-part="${p.id}" font-family="sans-serif">`;
     body+=`<text x="12" y="29" font-size="3.2">${rows.length?faceLabel+'から釘を打ち込む。単位mm。縦板は地から測ります。':'この板に打ち込む釘はありません。角加工の寸法はmm。'}</text>`;
     const outline=partOutline(p).map(([x,y])=>`${X(faceX(x))},${Y(y)}`).join(' '),clipId=`nail-face-${state.work}-${p.id}-${dir}`;
-    body+=`<defs><clipPath id="${clipId}"><polygon points="${outline}"/></clipPath></defs>`;
-    body+=`<polygon points="${outline}" fill="${FINISHED_BOARD}" stroke="${DRAW_INK}" stroke-width=".4"/>`;
+    const woodId=clipId+'-wood';
+    body+=`<defs><clipPath id="${clipId}"><polygon points="${outline}"/></clipPath>
+      ${laminateSvgPattern(woodId,ox,oy,scale,scale,grainVertical(p))}</defs>`;
+    body+=`<polygon points="${outline}" fill="url(#${woodId})" stroke="${DRAW_INK}" stroke-width=".4"/>`;
     const hole=holeOf(p);
     if(hole){
       if(hole.kind==='cable')body+=`<circle cx="${X(faceX(hole.cx))}" cy="${Y(hole.cy)}" r="${hole.r*scale}" fill="white" stroke="#00913c" stroke-width=".3"/>`;
@@ -4662,15 +4724,17 @@ function manualSheet(){
   for(const b of boards){
     const sc=mw/600, hh=Math.max(5,b.h*sc*0.55);
     my+=hh+2;
+    const id='manual-wood-'+state.work+'-'+b.id,wood=`url(#${id})`;
+    body+=`<defs>${laminateSvgPattern(id,mx,my-hh,sc,hh/b.h)}</defs>`;
     body+=`<rect x="${mx}" y="${my-hh}" width="${mw}" height="${hh}" fill="${OFFCUT}"
        stroke="#b8ae9e" stroke-width="0.25"/>`;
     for(const q of b.placed){
       const qx=mx+q.x*sc, qw=q.len*sc;
       const outline=stockCornerOutline(ps,q,qx,my-hh,sc,hh/b.h);
-      if(outline)body+=`<polygon points="${svgPoints(outline)}" fill="${FINISHED_BOARD}"/>`;
-      body+=`<rect x="${qx}" y="${my-hh}" width="${qw}" height="${hh}" fill="${outline?'none':FINISHED_BOARD}"
+      if(outline)body+=`<polygon points="${svgPoints(outline)}" fill="${wood}"/>`;
+      body+=`<rect x="${qx}" y="${my-hh}" width="${qw}" height="${hh}" fill="${outline?'none':wood}"
          stroke="${DRAW_INK}" stroke-width="0.3"/>`;
-      body+=sharedBlankSvg(ps,q,qx,my-hh,sc,hh/b.h);
+      body+=sharedBlankSvg(ps,q,qx,my-hh,sc,hh/b.h,wood);
       for(const part of stockMembers(ps,q))
         body+=cornerMarksSvg(part,stockDiagramPoint(part,q,qx,my-hh,sc,hh/b.h),{dimensions:false,blank:true});
       if(qw>12) body+=`<text x="${qx+qw/2}" y="${my-hh/2+1.1}" font-size="2.7"

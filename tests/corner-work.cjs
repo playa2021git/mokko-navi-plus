@@ -157,8 +157,17 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
         return sample;
       };
       const warm=colors(tile),neutral=colors(gray);
-      return warm.size>=6&&neutral.size>=5&&tile!==gray&&laminatedCanvas(true)!==tile;
+      return warm.size>=6&&neutral.size>=5&&tile!==gray&&tile.width===2*tile.height&&laminatedCanvas(true).height===tile.width;
     }));
+    assert(await page.evaluate(()=>{
+      const doc=document.createElement('div');doc.innerHTML=manualSheet();
+      const ids=[...doc.querySelectorAll('pattern')].map(p=>p.id);
+      if(new Set(ids).size!==ids.length)return false;
+      const material=doc.querySelector('pattern[id^="material-wood-"]');
+      const manual=doc.querySelector('pattern[id^="manual-wood-"]');
+      const nail=doc.querySelector('pattern[id^="nail-face-"]');
+      return [material,manual,nail].every(pattern=>pattern&&doc.querySelector(`[fill="url(#${pattern.id})"]`));
+    }), 'all three printed drawing types apply the wood grain to the part faces');
     const legacy=await page.evaluate(()=>readWorkCorner(validateDesign({
       version:11,work:'D',corners:{L:topFront(round_(42)),R:topFront(chamfer(25))}
     })));
