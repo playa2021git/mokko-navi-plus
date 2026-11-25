@@ -622,11 +622,11 @@ function laminatedCanvas(vertical,neutral=false){
   const g=c.getContext('2d');
   if(vertical){g.translate(c.width,0);g.rotate(Math.PI/2);}
   g.scale(1024/LAMINATE_LENGTH,512/LAMINATE_WIDTH);
-  const palette=neutral?['#fcfaf5','#faf7f1','#fdfbf7','#f9f6f0','#fbf8f3','#fcf9f4']:LAMINATE_COLORS;
+  const palette=neutral?['#fcfaf5','#f7f4ed','#fdfbf7','#f6f2eb','#fbf8f3','#faf7f0']:LAMINATE_COLORS;
   for(const {x,y,w,h,shade} of laminateDesign.cells){
     g.fillStyle=palette[shade];g.fillRect(x,y,w,h);
   }
-  for(const [lines,color,opacity,width] of [[laminateDesign.fibers,LAMINATE_FIBER,.14,.33],[laminateDesign.seams,LAMINATE_SEAM,.12,.5]]){
+  for(const [lines,color,opacity,width] of [[laminateDesign.fibers,LAMINATE_FIBER,neutral?.20:.14,.33],[laminateDesign.seams,LAMINATE_SEAM,neutral?.16:.12,.5]]){
     g.beginPath();
     for(const [x,y,a,b] of lines){g.moveTo(x,y);g.lineTo(a,b);}
     g.globalAlpha=opacity;g.strokeStyle=color;g.lineWidth=width;g.stroke();
@@ -1572,6 +1572,11 @@ function clearLearningCue(){
   clearTimeout(learningTimer);learningIds=new Set();highlightModel([]);
   document.querySelectorAll('.learn-cue').forEach(e=>e.classList.remove('learn-cue'));
 }
+function clearSelection(){
+  if(state.sel!==null)$('learningStatus').textContent='板を選ぶと、3Dと材料取り図で同じ板を確認できます。';
+  clearLearningCue();
+  state.sel=null;state.selKind='part';
+}
 function focusParts(ids,message){
   clearLearningCue();
   const ps=parts();ids=[...new Set(ids)].filter(id=>ps.some(p=>p.id===id));if(!ids.length)return;
@@ -1623,9 +1628,10 @@ if(HAS3D){
 
   const scene=new THREE.Scene(); scene.background=new THREE.Color(0xeceff1);
   const camera=new THREE.PerspectiveCamera(34,1,1,9000);
-  scene.add(new THREE.HemisphereLight(0xffffff,0x9aa3a8,0.95));
-  const s1=new THREE.DirectionalLight(0xffffff,0.5); s1.position.set(300,480,360); scene.add(s1);
-  const s2=new THREE.DirectionalLight(0xffffff,0.24); s2.position.set(-320,200,-260); scene.add(s2);
+  // 上向きの面に光が重なっても、集成材の淡い木目が見える明るさにする。
+  scene.add(new THREE.HemisphereLight(0xffffff,0xb5b8b9,0.77));
+  const s1=new THREE.DirectionalLight(0xffffff,0.26); s1.position.set(300,480,360); scene.add(s1);
+  const s2=new THREE.DirectionalLight(0xffffff,0.10); s2.position.set(-320,200,-260); scene.add(s2);
   const grid=new THREE.GridHelper(900,36,0xb4bfc6,0xd4dbdf); grid.position.y=-0.5; scene.add(grid);
   const group=new THREE.Group(); scene.add(group);
 
@@ -2190,9 +2196,8 @@ if(HAS3D){
   renderer.domElement.addEventListener('pointerup',e=>{
     if(drag&&drag.mode==='orbit'&&!drag.moved){
       const h=drag.hit||hitObj(e);
-      if(h){ state.sel=h.id; state.selKind=h.kind; }
-      else if(state.selKind==='ref'){ state.selKind='part'; state.sel=parts()[0].id; }
-      if(h&&h.kind==='part')focusParts([h.id]);else refresh();
+      if(h?.kind==='part')focusParts([h.id]);
+      else{clearSelection();refresh();}
     } drag=null;
   });
   renderer.domElement.addEventListener('wheel',e=>{ e.preventDefault();
@@ -2210,7 +2215,7 @@ if(HAS3D){
     if(e.key==='Delete'||e.key==='Backspace'){          // 消す
       e.preventDefault();
       state.refs=state.refs.filter(r=>r.id!==rf.id);
-      state.selKind='part'; state.sel=baseParts()[0].id; refresh(); return;
+      clearSelection(); refresh(); return;
     }
     const d=(e.shiftKey&&U[e.key])||K[e.key]; if(!d) return;
     e.preventDefault();
@@ -3190,8 +3195,7 @@ function buildParts(ps){
   }
   buildDims();updateMountControl();
 
-  const sel=(state.selKind==='part'&&ps.find(p=>p.id===state.sel))||ps[0];
-  state.sel=state.selKind==='part'?sel.id:state.sel;
+  const sel=state.selKind==='part'?ps.find(p=>p.id===state.sel):null;
   const cb=$('cbox'), targets=ps.filter(cornerTarget), corner=workCorner(ps);
   cb.innerHTML=(targets.length?`<p class="note">${targets.map(p=>esc(p.label)).join('・')}の${state.work==='G'&&state.cornerBoth?'前上・後ろ上':'前上'}の角をそろえます。</p>
     <div class="corner-controls"><label>形状 <select id="workCornerType">
@@ -3202,7 +3206,7 @@ function buildParts(ps){
       ${CORNER_SIZES.map(size=>`<option value="${size}">${size} mm</option>`).join('')}
     </select></label></div>
     ${state.work==='G'?`<label class="row"><input type="checkbox" id="workCornerBoth" ${state.cornerBoth?'checked':''}> 前後両側の角を加工する</label>`:''}`:'<p class="note">この作品には角加工の対象になる板がありません。</p>')
-    +(state.off[sel.id]?'<div class="row"><button id="ro">位置を戻す</button></div>':'');
+    +(sel&&state.off[sel.id]?'<div class="row"><button id="ro">位置を戻す</button></div>':'');
   if(targets.length){
     const type=$('workCornerType'),size=$('workCornerSize'),both=$('workCornerBoth');
     type.value=corner.type;size.value=corner.size;
@@ -3223,7 +3227,9 @@ function buildParts(ps){
   const ro=$('ro'); if(ro) ro.onclick=()=>{delete state.off[sel.id];refresh();};
 
   /* 製材所が切った端を持つ板だけ、向きを選べるようにする */
-  const eb=$('endBox'), FE=factoryEnds(ps), f=FE.get(sel.id);
+  const eb=$('endBox');
+  if(!sel){eb.innerHTML='<p class="note">板を選ぶと、製材所の端の使い方を確認できます。</p>';return;}
+  const f=factoryEnds(ps).get(sel.id);
   if(!f||(!f.s&&!f.e)){
     eb.innerHTML='<p class="note">この板には製材所の端がありません。'
       +'材料取り図でこの板を材料の端までドラッグすると、きれいな面が手に入ります。</p>';
@@ -3368,7 +3374,7 @@ function buildRefs(){
   $('rst').onclick=()=>{restRef(sel);refresh();};
   $('rdp').onclick=()=>{dropRef(sel);refresh();};
   $('rdl').onclick=()=>{state.refs=state.refs.filter(r=>r.id!==sel.id);
-    state.selKind='part'; state.sel=baseParts()[0].id; refresh();};
+    clearSelection(); refresh();};
 }
 
 function partTable(ps,withCorners=false){
@@ -3965,7 +3971,7 @@ function chooseWork(key,discard=false,gap=5){
   state.dimStep5=true; state.dims={}; state.comment=''; state.warned=false; dimKey=null; dimDrag=null;
   $('quiz').hidden=$('draw').hidden=$('view').hidden=$('sheet').hidden=true;
   state.refs.forEach(restRef);
-  state.sel=baseParts()[0].id; state.selKind='part';
+  state.sel=null; state.selKind='part';
   $('picker').style.display='none'; $('pClose').hidden=false;
   state.room=false; resize(); refresh(); fitView();
   state.screen='main'; stepBar($('mSteps'),'main');
@@ -4140,6 +4146,7 @@ function goScreen(k,skipCheck){
   $('sheet').hidden= (k!=='sheet');
   if(k==='pick'){ $('picker').style.display=''; buildCards(); }
   else $('picker').style.display='none';
+  if(k==='main'&&state.screen!=='main')clearSelection();
   state.screen=k;
   if(k==='main'){ resize(); refresh(); }
   if(k==='draw'){ state.drawZoom=null; requestAnimationFrame(()=>drawSheet()); }
@@ -4277,7 +4284,7 @@ $('openFile').onchange=e=>{
       $('learningStatus').textContent=migrated
         ?'保存した設計を復元しました。以前の板ごとの角加工を、作品共通の設定にまとめました。'
         :'保存した設計を復元しました。各画面は読み込んだ寸法で表示します。';
-      state.sel=baseParts()[0].id; state.selKind='part';
+      state.sel=null; state.selKind='part';
       $('pClose').hidden=false; state.warned=false;
       goScreen('main',true); fitView();
       savedDesign=designFingerprint();
@@ -5040,7 +5047,6 @@ function drawQuizResult(){
    13) 起動
    ========================================================= */
 buildCards();
-state.sel=baseParts()[0].id;
 resize(); refresh();
 goScreen('quiz');
 </script>
