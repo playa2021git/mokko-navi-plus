@@ -15,6 +15,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
      const nails=nailSpots(ps).filter(n=>n.driver===p.id);
      for(const panel of doc.querySelectorAll('[data-nail-part="'+p.id+'"]')){
       const nailsOnFace=[...panel.querySelectorAll('[data-nail-number]')];
+      if(!nailsOnFace.length)continue;
       const first=nails[Number(nailsOnFace[0].dataset.nailNumber)-1];
       const outline=panel.querySelector('clipPath polygon').points;
       const points=Array.from(outline),min=Math.min(...points.map(q=>q.x)),max=Math.max(...points.map(q=>q.x));

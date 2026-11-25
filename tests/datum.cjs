@@ -3,11 +3,11 @@ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8'),s=html.m
 const ctx=vm.createContext({console});vm.runInContext(s.slice(s.indexOf('const T=12'),s.indexOf('const stage=')),ctx);const run=x=>vm.runInContext(x,ctx);
 let checked=0,nearTop=0,nearGround=0;
 for(const key of 'ABCDEFGHIJKL')for(const mode of ['default','dimensions','flip','position','corner','hole']){
- run(`state.work='${key}';state.dims={};state.corners={};state.off={};state.nestX={};state.flip={};state.hole=null;state.handle=false;LBLKEY='';`);
+ run(`state.work='${key}';state.dims={};state.corner=null;state.off={};state.nestX={};state.flip={};state.hole=null;state.handle=false;LBLKEY='';`);
  if(mode==='dimensions')run('state.dims.W=defDims(state.work).W-2;state.dims.H=defDims(state.work).H-5');
  if(mode==='flip')run('for(const p of parts())state.flip[p.id]=true');
  if(mode==='position')run('for(const p of parts())state.nestX[p.id]=5');
- if(mode==='corner')run("state.corners.L=[{type:'round',size:5},none,none,none]");
+ if(mode==='corner')run("state.corner=round_(10)");
  if(mode==='hole')run("{const candidate=parts().find(p=>p.posture==='flat');if(candidate)state.hole={id:candidate.id,x:candidate.w/2};}");
  const ps=run('parts()');
  for(const p of ps){

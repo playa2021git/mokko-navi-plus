@@ -5,7 +5,7 @@ const ctx=vm.createContext({console});
 vm.runInContext(between('const T=12','const stage=')+between('function stockMembers(','function nestHole(')+between('function compartments(', 'const UNIT=')+
  between('function checkAll(','const nestCv=')+between('function validateDesign(',"$('openFile').onchange"),ctx);
 const run=s=>vm.runInContext(s,ctx);
-function select(key){run(`state.work='${key}';state.dims={};state.corners={};state.off={};state.nestX={};state.flip={};state.refs=[];state.hole=null;state.handle=false;LBLKEY='';`);}
+function select(key){run(`state.work='${key}';state.dims={};state.corner=null;state.off={};state.nestX={};state.flip={};state.refs=[];state.hole=null;state.handle=false;LBLKEY='';`);}
 assert.equal(run('STOCK.map(b=>b.h+"×"+b.w).join(",")'),'150×600,150×600,60×600');
 for(const key of ['K','L']){
  select(key);assert.equal(run('nest(parts()).left.length'),0);assert.equal(run('overlappingParts(parts()).length'),0);
