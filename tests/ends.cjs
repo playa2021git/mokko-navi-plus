@@ -4,17 +4,17 @@ const ctx=vm.createContext({console});vm.runInContext(script.slice(script.indexO
 for(const k of 'ABCDEFGHIJKL'){
  run(`state.work='${k}';state.dims={};state.corner=null;state.off={};state.nestX={};state.flip={};state.hole=null;state.handle=false;LBLKEY='';`);
  assert.equal(run('nest(parts()).left.length'),0,k+' fits');
- assert(run(`nest(parts()).boards.every(b=>b.placed.every((q,i)=>q.x===(i?b.placed[i-1].x+b.placed[i-1].len+KERF:0)&&q.x+q.len<=b.w))`),k+' left packed');
+ assert(run(`nest(parts()).boards.every(b=>b.placed.every((q,i)=>q.x===(b.placed.length===3&&i===2?b.w-q.len:i?b.placed[i-1].x+b.placed[i-1].len+KERF:0)&&q.x+q.len<=b.w))`),k+' default stock positions');
  const ps=run('JSON.stringify(parts())'),nails=run('JSON.stringify(nailSpots(parts()))');
  run(`for(const b of nest(parts()).boards){const q=b.placed.at(-1);if(q)state.nestX[q.id]=b.w-q.len;}`);
  assert(run('nest(parts()).boards.every(b=>!b.placed.length||b.placed.at(-1).endE)'),k+' right end');
  assert(run("parts().filter(p=>p.corners[3].type!=='none').every(p=>!factoryEnds(parts()).get(p.id)?.e)"),k+' factory edge kept away from cut');
  const saved=run('JSON.stringify({nestX:state.nestX,flip:state.flip})'),positions=run('JSON.stringify(nest(parts()))');
  run('state.nestX={};state.flip={}');run(`Object.assign(state,JSON.parse(${JSON.stringify(saved)}))`);assert.equal(run('JSON.stringify(nest(parts()))'),positions,k+' saved positions');
- run(`for(const b of nest(parts()).boards){const q=b.placed.at(-1);if(q&&q.x>1)state.nestX[q.id]=q.x-1;}`);
- assert(run('nest(parts()).boards.every(b=>!b.placed.length||b.placed.at(-1).x===0||!b.placed.at(-1).endE)'),k+' right end released');
+ run(`for(const b of nest(parts()).boards){const q=b.placed.at(-1);if(q&&q.x>1&&b.placed.length!==3)state.nestX[q.id]=q.x-1;}`);
+ assert(run('nest(parts()).boards.every(b=>!b.placed.length||b.placed.at(-1).x===0||(b.placed.length===3?b.placed.at(-1).endE:!b.placed.at(-1).endE))'),k+' right end released');
  assert(run('nest(parts()).boards.every(b=>b.placed.every((q,i)=>q.x>=0&&q.x+q.len<=b.w&&(!i||q.x>=b.placed[i-1].x+b.placed[i-1].len+KERF)))'));
  assert.equal(run('JSON.stringify(parts())'),ps);assert.equal(run('JSON.stringify(nailSpots(parts()))'),nails);
- console.log('PASS',k,'left packed, manual positions, ends, gaps, unchanged parts/nails');
+ console.log('PASS',k,'default placement, manual positions, ends, gaps, unchanged parts/nails');
 }
 assert(!script.includes('q.autoFlip='));assert(script.includes('Math.abs(x-target)<SNAP'));console.log('PASS: automatic stock orientation preserves factory edges; drag snap retained');

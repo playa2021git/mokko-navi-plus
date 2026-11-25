@@ -81,7 +81,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
         if(label&&labelsOn('drawCv')<3*dimensionsPerCut)throw Error('marking labels');
         if(label&&labelsOn('dimCv')!==dimensionsPerCut)throw Error('nail diagram labels');
         if(label&&fills.filter(color=>color===OFFCUT).length<3)throw Error('marking offcut fill');
-        for(const length of ['150','280','600'])
+        for(const length of ['150','左から 280 mm'])
           if(!texts.some(([id,t])=>id==='drawCv'&&t===length))throw Error('stock dimension '+length);
         return Array.from(new Uint8Array(buildSTL(5)));
       },{shape,amount,label});
