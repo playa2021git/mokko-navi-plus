@@ -14,7 +14,7 @@ labels = {
     'rw':'横', 'rd':'奥', 'rh':'高さ', 'dimStep5':'5mm刻みで調整する（外すと1mm刻み）',
     'splitK':'材料Bの取り方', 'holeSel':'ケーブルを通す穴（φ25）', 'handBtn':'くりぬく',
     'mCmt':'どうしてその大きさにしたのか', 'qCode':'タイプ番号',
-    'workCornerType':'形状', 'workCornerSize':'加工寸法'
+    'workCornerType':'形状', 'workCornerSize':'加工寸法', 'workCornerBoth':'前後両側の角を加工する'
 }
 families = {
     'data-s="${k}"':'⓪そうだん',

@@ -25,7 +25,7 @@ fs.mkdirSync(output,{recursive:true});
    const before=await snapshot();
    const downloadPromise=page.waitForEvent('download');await page.locator('#save').click();
    const download=await downloadPromise,file=path.join(output,key+'.json');await download.saveAs(file);
-   const saved=JSON.parse(fs.readFileSync(file));assert.equal(saved.version,12);assert(saved.nestBoard);
+   const saved=JSON.parse(fs.readFileSync(file));assert.equal(saved.version,13);assert(saved.nestBoard);
    await page.evaluate(()=>chooseWork('B',true));await page.locator('#openFile').setInputFiles(file);
    await page.waitForFunction(work=>!designReading&&state.work===work,key);
    const after=await snapshot();

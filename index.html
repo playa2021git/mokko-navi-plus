@@ -21,6 +21,7 @@ select:focus-visible{outline:2px solid #215c9b;outline-offset:2px}
 .corner-controls{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:8px 0 2px}
 .corner-controls label{display:flex;flex-direction:column;gap:2px;font-weight:600}
 .corner-controls select{width:100%;min-height:32px;padding:3px;font-weight:400}
+#workCornerBoth{accent-color:var(--accent)}
 button{background:#fff;border:1px solid var(--line);border-radius:5px;padding:4px 9px;cursor:pointer}
 button:hover{background:var(--soft)}
 button.on{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -581,6 +582,53 @@ function cutLen(p){ return lenAxis(p)==='h' ? p.h : p.w; }
 /* 木目の向き：切り取った長さが板の縦（h）なら縦木目 */
 function grainVertical(p){ return lenAxis(p)==='h'; }
 
+const LAMINATE_BASE='#e3c392',LAMINATE_TILE_MM=300;
+const laminateTiles=new Map();
+function laminatedCanvas(vertical,neutral=false){
+  const key=Number(vertical)+':'+Number(neutral);
+  if(laminateTiles.has(key))return laminateTiles.get(key);
+  const S=512,c=document.createElement('canvas');c.width=c.height=S;
+  const g=c.getContext('2d');
+  if(vertical){g.translate(S,0);g.rotate(Math.PI/2);}
+  const palette=neutral?['#fcfbf8','#eee9e0','#e4dbcf','#f5f1e9','#faf6ee']:
+    [LAMINATE_BASE,'#edcfa4','#dbb681','#f0d7b1','#e9c99b','#dcb989'];
+  let seed=6937;
+  const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+  const strip=S/13;
+  for(let row=0;row<13;row++){
+    const y=row*strip,start=-rnd()*S*.48;
+    const joint1=start+S*(.25+rnd()*.19),joint2=joint1+S*(.23+rnd()*.14);
+    const joints=[start,joint1,joint2,start+S];
+    let shade=Math.floor(rnd()*palette.length);
+    for(let j=0;j<3;j++){
+      const x=joints[j],width=joints[j+1]-x;
+      g.fillStyle=palette[shade];
+      shade=(shade+1+Math.floor(rnd()*(palette.length-1)))%palette.length;
+      for(const offset of [0,S])g.fillRect(x+offset,y,width,strip+.2);
+      const lines=Array.from({length:4},()=>[rnd()*width*.45,strip*(.13+rnd()*.74),width*(.28+rnd()*.23)]);
+      g.strokeStyle='rgba(112,77,37,.11)';g.lineWidth=.8;
+      for(const offset of [0,S]){
+        for(const [at,h,length] of lines){
+          g.beginPath();g.moveTo(x+offset+at,y+h);
+          g.lineTo(x+offset+at+length,y+h+.8);g.stroke();
+        }
+        g.fillStyle='rgba(112,77,37,.20)';g.fillRect(x+offset,y,1.25,strip);
+      }
+    }
+    g.fillStyle='rgba(112,77,37,.22)';g.fillRect(0,y,S,1.4);
+  }
+  laminateTiles.set(key,c);
+  return c;
+}
+function laminatedFill(g,x,y,scale,vertical=false){
+  if(typeof DOMMatrix==='undefined'||!(scale>0))return LAMINATE_BASE;
+  const tile=laminatedCanvas(vertical),pattern=g.createPattern(tile,'repeat');
+  if(!pattern?.setTransform)return LAMINATE_BASE;
+  const factor=scale*LAMINATE_TILE_MM/tile.width;
+  pattern.setTransform(new DOMMatrix([factor,0,0,factor,x,y]));
+  return pattern;
+}
+
 /* =========================================================
    2) 作品例A〜J（資料の部品表・組立図のとおり）
    すべて mm。x=左右 / y=高さ / z=前後（＋が手前）
@@ -801,7 +849,7 @@ const REF_KINDS={
 /* =========================================================
    4) 状態
    ========================================================= */
-const state={ work:'A', corner:null, off:{}, refs:[], nextRef:1, sel:null, selKind:'part',
+const state={ work:'A', corner:null, cornerBoth:false, off:{}, refs:[], nextRef:1, sel:null, selKind:'part',
   showNails:false, showDim:false, showNames:true, showEnds:false, room:false, scene:'desk',
   nestX:{}, nestBoard:{}, flip:{}, screen:'main', drawZoom:null,
   quiz:null, reco:null, refFull:null, // そうだんの答え・おすすめ作品・入りきらなかった物
@@ -899,9 +947,10 @@ function labels(){
 }
 function parts(){
   const ps=baseParts(), corner=workCorner(ps);
+  const ends=state.work==='G'&&state.cornerBoth?[none,none,corner,corner]:topFront(corner);
   return ps.map(p=>{
     const o=state.off[p.id]||[0,0,0];
-    return {...p, corners:cornerTarget(p)?topFront(corner):p.c, label:labels()[p.id]||p.name,
+    return {...p, corners:cornerTarget(p)?ends:p.c, label:labels()[p.id]||p.name,
             pos:p.pos.map((v,i)=>v+o[i]), moved:!!(o[0]||o[1]||o[2])};
   });
 }
@@ -1752,32 +1801,10 @@ if(HAS3D){
      板の木目は「600mmの材料から切り取った長さ」の向きに走る。
      だから 側板は下から上へ縦に、底板・天板・棚板・背板は横に流れる。
      ExtrudeGeometry のUVは板の面のmmそのままなので、300mmで1枚分に縮めて貼る。 */
-  function grainCanvas(vertical){
-    const S=512, c=document.createElement('canvas'); c.width=c.height=S;
-    const g=c.getContext('2d');
-    g.fillStyle='#ffffff'; g.fillRect(0,0,S,S);
-    if(vertical){ g.translate(S,0); g.rotate(Math.PI/2); }   // 同じ模様を90°回す＝縦の木目
-    let seed=20260914;
-    const rnd=()=>{ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; };
-    for(let i=0;i<30;i++){
-      const y0=rnd()*S, dark=rnd()<0.28;
-      g.strokeStyle = dark ? 'rgba(92,62,30,0.20)' : 'rgba(130,96,56,0.11)';
-      g.lineWidth = dark ? 1.1+rnd()*1.9 : 0.7+rnd()*1.2;
-      const n1=1+Math.floor(rnd()*2), n2=2+Math.floor(rnd()*3);
-      const a1=2+rnd()*6, a2=1+rnd()*3, p1=rnd()*6.283, p2=rnd()*6.283;
-      g.beginPath();
-      for(let x=0;x<=S;x+=4){
-        const u=x/S, y=y0+a1*Math.sin(6.283*n1*u+p1)+a2*Math.sin(6.283*n2*u+p2);
-        x?g.lineTo(x,y):g.moveTo(x,y);
-      }
-      g.stroke();
-    }
-    return c;
-  }
   function grainTex(vertical){
-    const t=new THREE.CanvasTexture(grainCanvas(vertical));
+    const t=new THREE.CanvasTexture(laminatedCanvas(vertical,true));
     t.wrapS=t.wrapT=THREE.RepeatWrapping;
-    t.repeat.set(1/300,1/300);
+    t.repeat.set(1/LAMINATE_TILE_MM,1/LAMINATE_TILE_MM);
     const cap=renderer.capabilities; t.anisotropy=(cap&&cap.getMaxAnisotropy)?cap.getMaxAnisotropy():1;
     return t;
   }
@@ -2290,19 +2317,21 @@ function stockPoint(p,q,fx,fy){
   if(stockFlip(q))along=q.len-along;
   return [along,across];
 }
-// 加工前の角を原点に、仕上がり線とさしがねで取る寸法を組み立てる。
+// 板の前上・後ろ上を同じ板面の座標で描く。
 function cornerMarks(p){
-  const corners=p.corners||p.c, c=corners[3];
-  if(c.type==='none')return null;
-  const size=cornerLengths(p.w,p.h,corners)[3];
-  const tangentX=[size,p.h],tangentY=[0,p.h-size];
-  const cut=c.type==='round'?Array.from({length:25},(_,i)=>{
-    const a=Math.PI/2+i*Math.PI/48;
-    return [size+size*Math.cos(a),p.h-size+size*Math.sin(a)];
-  }):[tangentX,tangentY];
-  const vertex=[0,p.h],center=c.type==='round'?[size,p.h-size]:null;
-  return {size,cut,vertex,center,offcut:[vertex,...cut]};
+  const corners=p.corners||p.c,sizes=cornerLengths(p.w,p.h,corners);
+  return [3,2].filter(i=>sizes[i]>0).map(i=>{
+    const size=sizes[i],x=i===3?0:p.w,dir=i===3?1:-1;
+    const vertex=[x,p.h],cx=x+dir*size,cy=p.h-size;
+    const center=corners[i].type==='round'?[cx,cy]:null;
+    const cut=center?Array.from({length:25},(_,n)=>{
+      const angle=n*Math.PI/48;
+      return [cx-dir*size*Math.sin(angle),cy+size*Math.cos(angle)];
+    }):[[cx,p.h],[x,cy]];
+    return {size,cut,vertex,center,offcut:[vertex,...cut]};
+  });
 }
+function hasCornerMarks(p){return (p.corners||p.c).slice(2).some(c=>c.type!=='none');}
 function stockDiagramPoint(p,q,x,y,sx,sy){
   return (fx,fy)=>{
     const [a,b]=stockPoint(p,q,fx,fy);
@@ -2310,7 +2339,7 @@ function stockDiagramPoint(p,q,x,y,sx,sy){
   };
 }
 function stockCornerOutline(ps,q,x,y,sx,sy){
-  const part=stockMembers(ps,q).find(p=>(p.corners||p.c)[3].type!=='none');
+  const part=stockMembers(ps,q).find(hasCornerMarks);
   if(!part)return null;
   const point=stockDiagramPoint(part,q,x,y,sx,sy);
   return partOutline(part,24).map(pt=>point(...pt));
@@ -2379,8 +2408,9 @@ function diagramDimensionSvg(d,u){
       paint-order="stroke" text-anchor="middle" dominant-baseline="central">${esc(d.text)}</text>`;
 }
 function drawCornerMarks(g,p,point,{u=1,dimensions=true,blank=false}={}){
-  const mark=cornerMarks(p);
-  if(!mark)return;
+  for(const mark of cornerMarks(p))drawCornerMark(g,mark,point,{u,dimensions,blank});
+}
+function drawCornerMark(g,mark,point,{u,dimensions,blank}){
   g.save();
   canvasPath(g,mark.offcut.map(pt=>point(...pt)));
   g.closePath();g.fillStyle=OFFCUT;g.fill();
@@ -2396,8 +2426,9 @@ function drawCornerMarks(g,p,point,{u=1,dimensions=true,blank=false}={}){
   g.restore();
 }
 function cornerMarksSvg(p,point,{u=.28,dimensions=true,blank=false}={}){
-  const mark=cornerMarks(p);
-  if(!mark)return '';
+  return cornerMarks(p).map(mark=>cornerMarkSvg(p,mark,point,{u,dimensions,blank})).join('');
+}
+function cornerMarkSvg(p,mark,point,{u,dimensions,blank}){
   const points=pts=>svgPoints(pts.map(pt=>point(...pt)));
   const center=mark.center&&point(...mark.center);
   return `<g data-corner-part="${p.id}">
@@ -2410,7 +2441,11 @@ function cornerMarksSvg(p,point,{u=.28,dimensions=true,blank=false}={}){
 function cornerMarkNote(){
   return '灰色の角は切り落とす部分。丸めは黒い点を中心に、矢印の半径で円弧を引きます。斜め切りは、横と縦の寸法の端を直線で結びます。';
 }
-function stockDimensions(b,x,y,sx,sy,u){
+function stockCornerBottomMargin(b,ps,u){
+  return b.placed.some(q=>stockMembers(ps,q).some(p=>cornerMarks(p).some(mark=>
+    !mark.center&&stockPoint(p,q,...mark.vertex)[1]>q.bw/2)))?23*u:0;
+}
+function stockDimensions(b,x,y,sx,sy,u,cornerMargin){
   const bottom=y+b.h*sy,right=x+b.w*sx;
   const lengths=b.placed.map(q=>[x+q.x*sx,x+(q.x+q.len)*sx,mm(q.len)]);
   const width=diagramDimension([x-12*u,y],[x-12*u,bottom],mm(b.h),u,{
@@ -2422,8 +2457,8 @@ function stockDimensions(b,x,y,sx,sy,u){
     d.paths.push([[a,bottom],[a,row+2*u]],[[b,bottom],[b,row+2*u]]);
     return d;
   };
-  return [width,...lengths.map(([a,b,text])=>across(a,b,text,bottom+17*u)),
-    across(x,right,mm(b.w),bottom+36*u)];
+  return [width,...lengths.map(([a,b,text])=>across(a,b,text,bottom+17*u+cornerMargin)),
+    across(x,right,mm(b.w),bottom+36*u+cornerMargin)];
 }
 function processLines(ps,q){
   let lines=[];
@@ -2444,7 +2479,7 @@ function drawSharedBlank(g,ps,q,x,y,sx,sy,nails=false){
   for(const p of members){
     const points=partOutline(p).map(([a,b])=>stockPoint(p,q,a,b));
     g.beginPath();points.forEach(([a,b],i)=>i?g.lineTo(x+a*sx,y+b*sy):g.moveTo(x+a*sx,y+b*sy));g.closePath();
-    g.fillStyle=state.selKind==='part'&&state.sel===p.id?'#c2694a':'#e8c99b';g.fill();
+    g.fillStyle=laminatedFill(g,x,y,sx);g.fill();
     g.strokeStyle='#6b5233';g.lineWidth=.9;g.stroke();
     if(q.len*sx>70&&q.bw*sy>20){
       const labelAt=q.process==='zigzag'?stockPoint(p,q,112,p.h*.42):stockPoint(p,q,p.w/2,30);
@@ -2491,13 +2526,13 @@ function sharedBlankSvg(ps,q,x,y,sx,sy){
   return svg;
 }
 function manufacturingSheet(ps){
-  const hasCorners=ps.some(cornerMarks);
+  const hasCorners=ps.some(hasCornerMarks);
   if(!WORKS[state.work].original&&!hasCorners)return '';
   const {boards}=nest(ps);let body='';
   const sx=.28,sy=sx,ox=22,u=.28;
   let oy=40;
   for(const b of boards){
-    const bh=b.h*sy,bw=b.w*sx;
+    const bh=b.h*sy,bw=b.w*sx,margin=stockCornerBottomMargin(b,ps,u);
     body+=`<text x="${ox}" y="${oy-10}" font-size="3.8" font-weight="600">材料${b.id}　12×${b.h}×${b.w} mm</text>`;
     body+=`<rect x="${ox}" y="${oy}" width="${bw}" height="${bh}" fill="${OFFCUT}"/>`;
     for(const q of b.placed){
@@ -2518,12 +2553,12 @@ function manufacturingSheet(ps){
       if(!q.endE)body+=`<rect x="${x+w}" y="${oy}" width="${after}" height="${bh}" fill="#ce847a"/>`;
     }
     body+=`<rect x="${ox}" y="${oy}" width="${bw}" height="${bh}" fill="none" stroke="${DRAW_INK}" stroke-width=".3"/>`;
-    body+=stockDimensions(b,ox,oy,sx,sy,u).map(d=>diagramDimensionSvg(d,u)).join('');
+    body+=stockDimensions(b,ox,oy,sx,sy,u,margin).map(d=>diagramDimensionSvg(d,u)).join('');
     const marks=b.placed.map(q=>mm(q.x)+'〜'+mm(q.x+q.len)).join(' ／ ');
-    if(marks)body+=`<text x="${ox}" y="${oy+bh+15}" font-size="2.6" fill="${DRAW_INK}">材料左端からの仕上がり位置　${marks}</text>`;
-    oy+=bh+28;
+    if(marks)body+=`<text x="${ox}" y="${oy+bh+15+margin}" font-size="2.6" fill="${DRAW_INK}">材料左端からの仕上がり位置　${marks}</text>`;
+    oy+=bh+28+margin;
   }
-  let y=234;
+  let y=Math.max(234,oy-2);
   const notes=hasCorners?[cornerMarkNote(),...processNotes(ps)]:processNotes(ps);
   for(const note of notes)for(const ln of wrapT(note,57)){
     body+=`<text x="14" y="${y}" font-size="3.1">${esc(ln)}</text>`;y+=4.2;
@@ -2607,16 +2642,17 @@ function drawNest(){
     g.fillText(`幅${b.h}`,    ox-labelW, oy+bh/2+10);
     g.fillStyle=OFFCUT; g.fillRect(ox,oy,bw,bh);
     g.strokeStyle='#b8ae9e'; g.strokeRect(ox+.5,oy+.5,bw,bh);
+    const wood=laminatedFill(g,ox,oy,sc);
 
     for(const q of b.placed){
       const x=ox+q.x*sc, pw=q.len*sc;
-      const sel=(state.selKind==='part'&&q.id===state.sel);
-      g.fillStyle=sel?'#e1edfa':FINISHED_BOARD;
+      const sel=(state.selKind==='part'&&q.members.includes(state.sel));
+      g.fillStyle=wood;
       const outline=stockCornerOutline(ps,q,x,oy,sc,sc);
       if(outline){canvasPath(g,outline);g.fill();}
       else g.fillRect(x,oy,pw,bh);
       g.strokeStyle=DRAW_INK; g.lineWidth=1; g.strokeRect(x+.5,oy+.5,pw,bh);
-      if((q.members||[q.id]).some(id=>learningIds.has(id))){g.save();g.strokeStyle='#2871a8';g.lineWidth=3;g.strokeRect(x+1.5,oy+1.5,pw-3,bh-3);g.restore();}
+      if(sel||(q.members||[q.id]).some(id=>learningIds.has(id))){g.save();g.strokeStyle='#2871a8';g.lineWidth=3;g.strokeRect(x+1.5,oy+1.5,pw-3,bh-3);g.restore();}
       if(pw>46&&bh>13){ g.fillStyle=DRAW_INK;
         g.fillText(`${q.label}`,x+3,oy+bh/2-1); g.fillText(`${mm(q.len)}`,x+3,oy+bh/2+10); }
       else if(pw>26){ g.fillStyle=DRAW_INK; g.fillText(`${mm(q.len)}`,x+2,oy+bh/2+4); }
@@ -2776,18 +2812,8 @@ function drawDim(){
   /* 板 */
   const out=partOutline(p);
   g.beginPath(); out.forEach((q,i)=>i?g.lineTo(X(faceX(q[0])),Y(q[1])):g.moveTo(X(faceX(q[0])),Y(q[1]))); g.closePath();
-  g.fillStyle=FINISHED_BOARD; g.fill();
+  g.fillStyle=laminatedFill(g,ox,oy,s,grainVertical(p)); g.fill();
   g.strokeStyle=DRAW_INK; g.lineWidth=1.6; g.stroke();
-  /* 木目 */
-  g.save(); g.clip();
-  g.strokeStyle='rgba(140,104,60,.30)'; g.lineWidth=1;
-  const vert=grainVertical(p);
-  for(let t=8;t<(vert?p.w:p.h);t+=11){
-    g.beginPath();
-    if(vert){ g.moveTo(X(t),Y(0)); g.lineTo(X(t),Y(p.h)); } else { g.moveTo(X(0),Y(t)); g.lineTo(X(p.w),Y(t)); }
-    g.stroke();
-  }
-  g.restore();
   /* 穴 */
   const hole=holeOf(p),hl=hole&&{...hole,cx:faceX(hole.cx)};
   if(hl){
@@ -2922,13 +2948,13 @@ function drawSheet(){
     + (isOriginal()?' ／ <b style="color:#b8761c">あなたのオリジナル寸法です（説明書の数字とはちがいます）</b>':'');
   $('dZoomOut').hidden = !zoom;
   $('dfoot').innerHTML =
-    `<span class="legend"><span><i style="--swatch:${FINISHED_BOARD}"></i>仕上がり</span>
+    `<span class="legend"><span><i style="--swatch:${LAMINATE_BASE}"></i>仕上がり</span>
       <span><i style="--swatch:${OFFCUT}"></i>切り落とす部分・余り</span>
       <span><i style="--swatch:${FACTORY_EDGE}"></i>そのまま使う材料端</span>
       <span><i style="--swatch:#ce847a"></i>切りしろ ${state.gap} mm</span></span>`
     +'<b>単位 mm</b><br>「左から」「右から」の端にメジャーの0を当て、印をつけたら、さしがねで垂線を引きます。'
     +'けがきは<b>仕上がり線</b>と<b>切断線</b>の2本を引きましょう。'
-    +(ps.some(cornerMarks)?'<br>'+cornerMarkNote():'')
+    +(ps.some(hasCornerMarks)?'<br>'+cornerMarkNote():'')
     +(WORKS[state.work].original?'<br>'+processNotes(ps).map(esc).join('<br>'):'')
     +(isOriginal()&&state.comment
       ? `<br><span style="color:#b8761c">あなたのオリジナル寸法の理由：${
@@ -2949,7 +2975,7 @@ function drawSheet(){
     const lines=stockMeasureLines(b);
     return Math.max(1,...[0,b.w].map(origin=>lines.filter(l=>l.origin===origin).length));
   };
-  const rowHeight=b=>TOP+b.h*sc+BASE+15*lanes(b)+5;
+  const rowHeight=b=>TOP+b.h*sc+BASE+stockCornerBottomMargin(b,ps,1)+15*lanes(b)+5;
   const contentHeight=list.reduce((height,b)=>height+rowHeight(b),0);
   const H=Math.ceil(Math.max(drawCv.parentElement.clientHeight,contentHeight+5));
   drawCv.style.height=H+'px';
@@ -2967,7 +2993,7 @@ function drawSheet(){
   list.forEach(b=>{
     const bw=b.w*sc,bh=b.h*sc;
     const ox=LW+Math.max(0,(W-LW-RW-bw)/2);
-    const oy=rowTop+TOP;
+    const oy=rowTop+TOP,margin=stockCornerBottomMargin(b,ps,1);
     rowTop+=rowHeight(b);
 
     /* 見出し */
@@ -2977,11 +3003,12 @@ function drawSheet(){
     g.fillText(`12 × ${b.h} × ${b.w}`, ox-LW, oy-8);
 
     /* 板 */
+    const wood=laminatedFill(g,ox,oy,sc);
     g.fillStyle=OFFCUT; g.fillRect(ox,oy,bw,bh);
 
     for(const q of b.placed){
       const x=ox+q.x*sc, pw=q.len*sc;
-      g.fillStyle=FINISHED_BOARD;
+      g.fillStyle=wood;
       const outline=stockCornerOutline(ps,q,x,oy,sc,sc);
       if(outline){canvasPath(g,outline);g.fill();}
       else g.fillRect(x,oy,pw,bh);
@@ -3053,7 +3080,7 @@ function drawSheet(){
         drawCornerMarks(g,part,stockDiagramPoint(part,q,x,oy,sc,sc),{blank:true});
     }
     g.strokeStyle=DRAW_INK;g.lineWidth=1;g.strokeRect(ox,oy,bw,bh);
-    for(const d of stockDimensions(b,ox,oy,sc,sc,1))drawDiagramDimension(g,d);
+    for(const d of stockDimensions(b,ox,oy,sc,sc,1,margin))drawDiagramDimension(g,d);
     /* 余り */
     g.fillStyle=DRAW_INK; g.textAlign='center'; g.font=`${11.5*F}px system-ui`;
     for(const [a1,a2] of b.gaps){
@@ -3063,14 +3090,14 @@ function drawSheet(){
 
     if(needsStockEndAdjustment(b)){
       g.font='12px system-ui';g.textAlign='center';g.fillStyle='#815321';
-      g.fillText('②3Dで確認に戻り、板を材料の端に寄せて、工場で切った端を活用しましょう。',ox+bw/2,oy+bh+51,W-16);
+      g.fillText('②3Dで確認に戻り、板を材料の端に寄せて、工場で切った端を活用しましょう。',ox+bw/2,oy+bh+51+margin,W-16);
       return;
     }
     const levels={0:0,[b.w]:0};
     g.font='11px system-ui';g.textAlign='center';
     for(const {origin,mark,distance} of stockMeasureLines(b)){
       const from=ox+origin*sc,to=ox+mark*sc;
-      const y=oy+bh+52+15*levels[origin]++;
+      const y=oy+bh+52+margin+15*levels[origin]++;
       g.strokeStyle='#786b55';g.lineWidth=1;
       g.beginPath();g.moveTo(from,y-3);g.lineTo(from,y+3);g.moveTo(from,y);g.lineTo(to,y);
       g.moveTo(to,y-3);g.lineTo(to,y+3);g.stroke();
@@ -3106,17 +3133,18 @@ function buildParts(ps){
   const sel=(state.selKind==='part'&&ps.find(p=>p.id===state.sel))||ps[0];
   state.sel=state.selKind==='part'?sel.id:state.sel;
   const cb=$('cbox'), targets=ps.filter(cornerTarget), corner=workCorner(ps);
-  cb.innerHTML=(targets.length?`<p class="note">${targets.map(p=>esc(p.label)).join('・')}の前上の角をそろえます。</p>
+  cb.innerHTML=(targets.length?`<p class="note">${targets.map(p=>esc(p.label)).join('・')}の${state.work==='G'&&state.cornerBoth?'前上・後ろ上':'前上'}の角をそろえます。</p>
     <div class="corner-controls"><label>形状 <select id="workCornerType">
       <option value="none">そのまま</option><option value="round">丸くする</option>
       <option value="chamfer">斜めに切り落とす</option>
     </select></label>
     <label ${corner.type==='none'?'hidden':''}>${corner.type==='round'?'半径':'両辺から'} <select id="workCornerSize">
       ${CORNER_SIZES.map(size=>`<option value="${size}">${size} mm</option>`).join('')}
-    </select></label></div>`:'<p class="note">この作品には角加工の対象になる板がありません。</p>')
+    </select></label></div>
+    ${state.work==='G'?`<label class="row"><input type="checkbox" id="workCornerBoth" ${state.cornerBoth?'checked':''}> 前後両側の角を加工する</label>`:''}`:'<p class="note">この作品には角加工の対象になる板がありません。</p>')
     +(state.off[sel.id]?'<div class="row"><button id="ro">位置を戻す</button></div>':'');
   if(targets.length){
-    const type=$('workCornerType'),size=$('workCornerSize');
+    const type=$('workCornerType'),size=$('workCornerSize'),both=$('workCornerBoth');
     type.value=corner.type;size.value=corner.size;
     type.onchange=size.onchange=()=>{
       const control=document.activeElement;
@@ -3124,6 +3152,12 @@ function buildParts(ps){
       state.warned=false;
       refresh();
       if(control===type||control===size)$(control.id).focus();
+    };
+    if(both)both.onchange=()=>{
+      state.cornerBoth=both.checked;
+      state.warned=false;
+      refresh();
+      $('workCornerBoth').focus();
     };
   }
   const ro=$('ro'); if(ro) ro.onclick=()=>{delete state.off[sel.id];refresh();};
@@ -3835,7 +3869,7 @@ function buildCards(){
 }
 let savedDesign=null;
 function designFingerprint(){
-  return JSON.stringify([state.gap,state.kSplit,state.bookend,state.work,state.dims,state.corner,state.off,state.nestX,state.nestBoard,state.flip,
+  return JSON.stringify([state.gap,state.kSplit,state.bookend,state.work,state.dims,state.corner,state.cornerBoth,state.off,state.nestX,state.nestBoard,state.flip,
     state.hole,state.handle,state.handleY,state.comment,state.who,state.refs,state.scene]);
 }
 function hasUnsavedChanges(){return savedDesign!==null&&savedDesign!==designFingerprint();}
@@ -3866,7 +3900,7 @@ function chooseWork(key,discard=false,gap=5){
   designReadId++;designReading=false;
   clearLearningCue();$('learningStatus').textContent='板を選ぶと、3Dと材料取り図で同じ板を確認できます。';
   nestMessage='';
-  state.gap=gap;state.kSplit=false;state.bookend=false;state.work=key; state.corner=null; state.off={}; state.nestX={}; state.nestBoard={}; state.flip={};
+  state.gap=gap;state.kSplit=false;state.bookend=false;state.work=key; state.corner=null; state.cornerBoth=false; state.off={}; state.nestX={}; state.nestBoard={}; state.flip={};
   state.hole=null; state.handle=false; state.handleY=40;
   state.dimStep5=true; state.dims={}; state.comment=''; state.warned=false; dimKey=null; dimDrag=null;
   $('quiz').hidden=$('draw').hidden=$('view').hidden=$('sheet').hidden=true;
@@ -3917,7 +3951,7 @@ function buildAllSTL(divisor,keys='ABCDEFGHIJKL'){
   const saved={...state},oldLabels=LBL,oldKey=LBLKEY,models=[];
   try{
     for(const key of keys){
-      Object.assign(state,{work:key,dims:{},corner:null,off:{},nestX:{},nestBoard:{},flip:{},hole:null,handle:false});LBLKEY='';
+      Object.assign(state,{work:key,dims:{},corner:null,cornerBoth:false,off:{},nestX:{},nestBoard:{},flip:{},hole:null,handle:false});LBLKEY='';
       const data=buildSTL(divisor),v=new DataView(data),count=v.getUint32(80,true),lo=[Infinity,Infinity],hi=[-Infinity,-Infinity];
       for(let n=0;n<count;n++)for(let j=0;j<3;j++)for(let a=0;a<2;a++){
         const x=v.getFloat32(84+n*50+12+j*12+a*4,true);lo[a]=Math.min(lo[a],x);hi[a]=Math.max(hi[a],x);
@@ -3992,7 +4026,7 @@ $('stlForm').onsubmit=async e=>{
   finally{button.disabled=false;}
 };
 function saveFile(){
-  const d=JSON.stringify({version:12,work:state.work,corner:state.corner,
+  const d=JSON.stringify({version:13,work:state.work,corner:state.corner,cornerBoth:state.cornerBoth,
     off:state.off,nestX:state.nestX,nestBoard:state.nestBoard,flip:state.flip,
     gap:state.gap,kSplit:state.kSplit,bookend:state.bookend,dimStep5:state.dimStep5,dims:state.dims,comment:state.comment,who:state.who,scene:state.scene,
     quiz:state.quiz,reco:state.reco,
@@ -4124,7 +4158,7 @@ function validateDesign(d){
   if(!object(d)||!Object.hasOwn(WORKS,d.work)) throw new Error('作品番号が不正です');
   if(d.gap!==undefined&&![5,10].includes(d.gap))throw new Error('切りしろは5mmまたは10mmです');
   for(const key of ['kSplit','bookend'])if(d[key]!==undefined&&typeof d[key]!=='boolean')throw new Error('端材設定が不正です');
-  if(d.version!==undefined&&(!Number.isInteger(d.version)||d.version>12||d.version<1)) throw new Error('未対応の保存形式です');
+  if(d.version!==undefined&&(!Number.isInteger(d.version)||d.version>13||d.version<1)) throw new Error('未対応の保存形式です');
   for(const key of ['dims','corners','off','nestX','nestBoard','flip'])
     if(d[key]!==undefined&&!object(d[key])) throw new Error(key+'の形式が不正です');
   for(const key of ['comment','who'])
@@ -4138,6 +4172,8 @@ function validateDesign(d){
     if(!Array.isArray(cs)||cs.length!==4||cs.some(c=>!object(c)||!['none','round','chamfer'].includes(c.type)||!finite(c.size)||c.size<0)) throw new Error('角加工の形式が不正です');
   if(d.corner!=null&&(!object(d.corner)||!CORNER_TYPES.includes(d.corner.type)||!CORNER_SIZES.includes(d.corner.size)))
     throw new Error('作品の角加工の形式が不正です');
+  if(d.cornerBoth!==undefined&&(typeof d.cornerBoth!=='boolean'||(d.cornerBoth&&d.work!=='G')))
+    throw new Error('両側の角加工は作品Gの設定です');
   for(const a of Object.values(d.off||{}))
     if(!Array.isArray(a)||a.length!==3||!a.every(finite)) throw new Error('部品位置が不正です');
   for(const v of Object.values(d.nestX||{})) if(!finite(v)) throw new Error('材料位置が不正です');
@@ -4163,7 +4199,7 @@ $('openFile').onchange=e=>{
     if(designFingerprint()!==startedFrom){designReading=false;$('learningStatus').textContent='読み込み中に設計が変更されたため、現在の設計を保持しました。必要ならもう一度ファイルを開いてください。';return;}
     const previous=JSON.parse(JSON.stringify(state)); try{
       const d=validateDesign(JSON.parse(r.result));
-      state.work=d.work; state.corner=readWorkCorner(d); state.off=d.off||{};
+      state.work=d.work; state.corner=readWorkCorner(d); state.cornerBoth=d.cornerBoth===true; state.off=d.off||{};
       state.nestX=d.nestX||{}; state.nestBoard=d.nestBoard||{}; state.flip=d.flip||{};
       state.hole=d.hole||null; state.handle=!!d.handle; state.handleY=d.handleY??40;
       state.gap=d.gap===10?10:5;state.kSplit=d.work==="K"&&d.kSplit===true;state.bookend=state.kSplit&&d.bookend===true;state.dimStep5=d.dimStep5!==false; state.dims=d.dims||{}; state.comment=d.comment||''; state.who=d.who||'';
@@ -4335,6 +4371,9 @@ const CNAME=['左下','右下','右上','左上'];
 
 function cornerText(p){
   const sizes=cornerLengths(p.w,p.h,p.corners);
+  const rear=p.corners[2],front=p.corners[3];
+  if(rear.type!=='none'&&rear.type===front.type&&sizes[2]===sizes[3])
+    return '上の両角 '+(rear.type==='round'?'R':'斜め')+mm(sizes[3]);
   const t=p.corners.map((c,i)=>c.type==='none'?null
     :`${CNAME[i]}${c.type==='round'?'R':''}${mm(sizes[i])}`
      +`${c.type==='chamfer'?' mm（両辺）の斜め':''}`).filter(Boolean);
@@ -4432,7 +4471,7 @@ function assemblySteps(ps){
 function nailDatumSheet(ps){
   return ps.map(p=>{
     const faces=drivingFaces(p,ps);
-    if(!faces.length&&cornerMarks(p))faces.push({dir:0,x:x=>x,rows:[],label:'加工する面'});
+    if(!faces.length&&hasCornerMarks(p))faces.push({dir:0,x:x=>x,rows:[],label:'加工する面'});
     return faces.map(({dir,x:faceX,rows,label:faceLabel})=>{
     const xs=[...new Set(rows.map(r=>r.f[0]))].sort((a,b)=>a-b);
     const ys=[...new Set(rows.map(r=>r.f[1]))].sort((a,b)=>a-b);
@@ -4462,7 +4501,7 @@ function nailDatumSheet(ps){
         :`<line x1="${X(faceX(value))}" y1="${Y(0)}" x2="${X(faceX(value))}" y2="${Y(p.h)}" stroke="#00a344" stroke-width="1.1" clip-path="url(#${clipId})"/>`;
     }}
     body+=cornerMarksSvg(p,(x,y)=>[X(faceX(x)),Y(y)]);
-    if(cornerMarks(p))body+=wrapT(cornerMarkNote(),56)
+    if(hasCornerMarks(p))body+=wrapT(cornerMarkNote(),56)
       .map((line,i)=>`<text x="12" y="${188+i*4}" font-size="2.9">${esc(line)}</text>`).join('');
     const line=(x1,y1,x2,y2)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#aa9e90" stroke-width=".2"/>`;
     xs.forEach((fx,i)=>{
